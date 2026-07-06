@@ -55,6 +55,31 @@ app.MapGet("/api/ping", () =>
         time = DateTime.Now
     });
 });
+app.MapPost("/api/transcribe", async (HttpRequest request) =>
+{
+    var form = await request.ReadFormAsync();
+    var audio = form.Files["audio"];
+
+    if (audio == null)
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Ses dosyası bulunamadı"
+        });
+    }
+
+    Console.WriteLine(
+        $"Ses geldi: {audio.FileName} - {audio.Length} byte"
+    );
+
+    return Results.Ok(new
+    {
+        success = true,
+        fileName = audio.FileName,
+        size = audio.Length
+    });
+});
 
 app.Run();
 

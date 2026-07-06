@@ -103,6 +103,33 @@ export function useRecorder(): UseRecorderReturn {
     const wavBlob = encodeWAV(merged, TARGET_SAMPLE_RATE);
     setAudioBlob(wavBlob);
 
+    const sendAudio = async () => {
+  const formData = new FormData();
+
+  formData.append(
+    "audio",
+    wavBlob,
+    "recording.wav"
+  );
+
+  const response = await fetch(
+    "http://localhost:5166/api/transcribe",
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  console.log(
+    "[Backend cevabı]",
+    data
+  );
+};
+
+sendAudio();
+
     const durationSeconds = merged.length / TARGET_SAMPLE_RATE;
     console.log(
       `[useRecorder] Kayıt tamamlandı: ${durationSeconds.toFixed(2)} saniye, ` +

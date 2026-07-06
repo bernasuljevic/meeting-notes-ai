@@ -13,10 +13,22 @@ export function Recorder() {
   } = useRecorder();
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6">
-      <h2 className="text-xl font-semibold">Ses Kaydı</h2>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "20px",
+        alignItems: "center",
+      }}
+    >
+      <h2>Ses Kaydı</h2>
 
-      <div className="flex gap-3">
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+        }}
+      >
         <button
           onClick={startRecording}
           disabled={isRecording}
@@ -33,25 +45,36 @@ export function Recorder() {
       </div>
 
       {isRecording && (
-        <div className="w-64 h-3 bg-gray-200 rounded overflow-hidden">
+        <div
+          style={{
+            width: "250px",
+            height: "15px",
+            background: "#ddd",
+            borderRadius: "8px",
+            overflow: "hidden",
+          }}
+        >
           <div
-            className="h-full bg-green-500 transition-all duration-75"
-            style={{ width: `${level * 100}%` }}
+            style={{
+              width: `${level * 100}%`,
+              height: "100%",
+              background: "green",
+              transition: "width 0.05s",
+            }}
           />
         </div>
       )}
 
       {error && (
-        <p className="text-red-600 text-sm">
+        <p style={{ color: "red" }}>
           Hata: {error}
         </p>
       )}
 
       {audioBlob && !isRecording && (
-        <div className="text-sm text-gray-600">
+        <div>
           Kayıt hazır (
           {(audioBlob.size / 1024).toFixed(1)} KB, WAV)
-          — konsolu kontrol et.
         </div>
       )}
     </div>
