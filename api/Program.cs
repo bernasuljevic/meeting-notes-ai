@@ -5,6 +5,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Whisper servisi
 builder.Services.AddSingleton<TranscriptionService>();
 
+// Özetleme servisi (şimdilik placeholder, ileride Claude API ile değiştirilecek)
+builder.Services.AddSingleton<
+    ISummarizationService,
+    PlainTextSummarizationService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact",
@@ -21,6 +26,9 @@ builder.Services.AddCors(options =>
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Whisper modelini uygulama açılışında yükle
+app.Services.GetRequiredService<TranscriptionService>();
 
 app.UseCors("AllowReact");
 
@@ -115,6 +123,45 @@ app.MapPost(
     }
 });
 
+app.MapPost(
+    "/api/summarize",
+    async (
+        SummarizeRequest request,
+        ISummarizationService summarizationService
+    ) =>
+{
+    if (string.IsNullOrWhiteSpace(
+        request.Transcript))
+    {
+        return Results.BadRequest(new
+        {
+            error = "Transcript boş olamaz."
+        });
+    }
+
+    try
+    {
+        var summary =
+            await summarizationService
+                .SummarizeAsync(
+                    request.Transcript);
+
+        return Results.Ok(
+            new SummarizeResponse(summary));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(
+            $"Özetleme hatası: {ex.Message}"
+        );
+
+        return Results.Problem(
+            title: "Özetleme başarısız",
+            detail: ex.Message
+        );
+    }
+});
+
 app.Run();
 
 record WeatherForecast(
@@ -125,3 +172,9 @@ record WeatherForecast(
     public int TemperatureF =>
         32 + (int)(TemperatureC / 0.5556);
 }
+
+public record SummarizeRequest(
+    string Transcript);
+
+public record SummarizeResponse(
+    string Summary);
