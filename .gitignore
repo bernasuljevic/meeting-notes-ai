@@ -1,0 +1,24 @@
+# .NET
+bin/
+obj/
+
+# React
+node_modules/
+dist/
+
+# Visual Studio
+.vs/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Whisper models
+*.bin
+Models/
+
+# Environment
+.env
+.env.local
