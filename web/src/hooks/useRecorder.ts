@@ -102,6 +102,8 @@ export function useRecorder(): UseRecorderReturn {
     const merged = mergeBuffers(recordedChunksRef.current);
     const wavBlob = encodeWAV(merged, TARGET_SAMPLE_RATE);
     setAudioBlob(wavBlob);
+    const url = URL.createObjectURL(wavBlob);
+window.open(url);
 
     const sendAudio = async () => {
   const formData = new FormData();
@@ -123,9 +125,9 @@ export function useRecorder(): UseRecorderReturn {
   const data = await response.json();
 
   console.log(
-    "[Backend cevabı]",
-    data
-  );
+  "[Backend cevabı]",
+  JSON.stringify(data, null, 2)
+);
 };
 
 sendAudio();

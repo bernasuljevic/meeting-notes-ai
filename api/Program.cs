@@ -1,4 +1,9 @@
+using api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Whisper servisi
+builder.Services.AddSingleton<TranscriptionService>();
 
 builder.Services.AddCors(options =>
 {
@@ -55,9 +60,16 @@ app.MapGet("/api/ping", () =>
         time = DateTime.Now
     });
 });
-app.MapPost("/api/transcribe", async (HttpRequest request) =>
+
+app.MapPost(
+    "/api/transcribe",
+    async (
+        HttpRequest request,
+        TranscriptionService transcriptionService
+    ) =>
 {
     var form = await request.ReadFormAsync();
+
     var audio = form.Files["audio"];
 
     if (audio == null)
@@ -73,17 +85,43 @@ app.MapPost("/api/transcribe", async (HttpRequest request) =>
         $"Ses geldi: {audio.FileName} - {audio.Length} byte"
     );
 
-    return Results.Ok(new
+    await using var stream =
+        audio.OpenReadStream();
+
+    try
     {
-        success = true,
-        fileName = audio.FileName,
-        size = audio.Length
-    });
+        var transcript =
+            await transcriptionService
+                .TranscribeAsync(stream);
+
+        return Results.Ok(new
+        {
+            success = true,
+            fileName = audio.FileName,
+            size = audio.Length,
+            transcript
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(
+            $"Whisper hatası: {ex.Message}"
+        );
+
+        return Results.Problem(
+            title: "Transkripsiyon başarısız",
+            detail: ex.Message
+        );
+    }
 });
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+record WeatherForecast(
+    DateOnly Date,
+    int TemperatureC,
+    string? Summary)
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    public int TemperatureF =>
+        32 + (int)(TemperatureC / 0.5556);
 }

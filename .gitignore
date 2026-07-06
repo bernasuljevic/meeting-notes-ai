@@ -22,3 +22,12 @@ Models/
 # Environment
 .env
 .env.local
+# Whisper modelleri
+api/Models/*.bin
+
+# Geçici ses dosyaları
+api/Uploads/
+
+# ASP.NET build dosyaları
+api/bin/
+api/obj/
