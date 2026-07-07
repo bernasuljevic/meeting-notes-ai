@@ -2,7 +2,7 @@ namespace api.Services;
 
 public interface ISummarizationService
 {
-    Task<string> SummarizeAsync(
+    Task<MeetingSummary> SummarizeAsync(
         string transcript,
         CancellationToken cancellationToken = default
     );

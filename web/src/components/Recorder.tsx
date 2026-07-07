@@ -1,19 +1,31 @@
 // web/src/components/Recorder.tsx
+import { LevelMeter } from "./LevelMeter";
 import { useEffect, useState } from "react";
 import { useRecorder } from "../hooks/useRecorder";
-import { transcribeAudio } from "../lib/api";
+import {
+  transcribeAudio,
+  summarizeTranscript,
+} from "../lib/api";
+
+import type {
+  SummarizeResponse,
+} from "../lib/api";
+
+import { TranscriptPanel } from "./TranscriptPanel";
+import { NotesPanel } from "./NotesPanel";
 
 export function Recorder() {
   const { isRecording, level, audioBlob, error, startRecording, stopRecording } = useRecorder();
 
-  // --- YENİ EKLENEN STATE'LER ---
   const [transcript, setTranscript] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
-  // --- YENİ EKLENEN STATE'LER BİTTİ ---
 
-  // audioBlob her yeni kayıt bittiğinde doluyor (useRecorder.ts zaten bunu yapıyor).
-  // Bu değişikliği yakalayıp otomatik olarak backend'e gönderiyoruz.
+  // --- GÜNCELLENDİ: summary artık düz string değil, yapılandırılmış nesne ---
+  const [summary, setSummary] = useState<SummarizeResponse | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summarizeError, setSummarizeError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!audioBlob) {
       return;
@@ -25,6 +37,8 @@ export function Recorder() {
       setIsTranscribing(true);
       setTranscribeError(null);
       setTranscript(null);
+      setSummary(null);
+      setSummarizeError(null);
 
       try {
         const result = await transcribeAudio(audioBlob!);
@@ -50,6 +64,25 @@ export function Recorder() {
     };
   }, [audioBlob]);
 
+  async function handleSummarize() {
+    if (!transcript) {
+      return;
+    }
+
+    setIsSummarizing(true);
+    setSummarizeError(null);
+
+    try {
+      const result = await summarizeTranscript(transcript);
+      setSummary(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Özetleme başarısız.";
+      setSummarizeError(message);
+    } finally {
+      setIsSummarizing(false);
+    }
+  }
+
   return (
     <div className="flex flex-col items-center gap-4 p-6">
       <h2 className="text-xl font-semibold">Ses Kaydı</h2>
@@ -71,33 +104,38 @@ export function Recorder() {
         </button>
       </div>
 
-      {isRecording && (
-        <div className="w-64 h-3 bg-gray-200 rounded overflow-hidden">
-          <div
-            className="h-full bg-green-500 transition-all duration-75"
-            style={{ width: `${level * 100}%` }}
-          />
-        </div>
-      )}
+      <LevelMeter
+  level={level}
+  isRecording={isRecording}
+/>
+
 
       {error && <p className="text-red-600 text-sm">Kayıt hatası: {error}</p>}
 
-      {/* --- YENİ EKLENEN GÖRÜNÜM: Transkripsiyon durumu --- */}
-      {isTranscribing && (
-        <p className="text-gray-600 text-sm">Transkript oluşturuluyor, lütfen bekleyin...</p>
-      )}
+<TranscriptPanel
+  transcript={transcript}
+  isTranscribing={isTranscribing}
+  error={transcribeError}
+/>
 
-      {transcribeError && (
-        <p className="text-red-600 text-sm">Transkripsiyon hatası: {transcribeError}</p>
-      )}
+{transcript && (
+  <button
+    onClick={handleSummarize}
+    disabled={isSummarizing}
+    className="px-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50"
+  >
+    {isSummarizing
+      ? "Özetleniyor..."
+      : "Özet Oluştur"}
+  </button>
+)}
 
-      {transcript && !isTranscribing && (
-        <div className="w-full max-w-md rounded border border-gray-300 p-4">
-          <h3 className="text-sm font-semibold text-gray-500 mb-2">Transkript</h3>
-          <p className="text-gray-900 whitespace-pre-wrap">{transcript}</p>
-        </div>
-      )}
-      {/* --- YENİ EKLENEN GÖRÜNÜM BİTTİ --- */}
+<NotesPanel
+  summary={summary}
+  isSummarizing={isSummarizing}
+  error={summarizeError}
+/>
+
     </div>
   );
 }

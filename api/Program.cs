@@ -1,4 +1,5 @@
 using api.Services;
+using System.Collections.Generic;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -123,41 +124,34 @@ app.MapPost(
     }
 });
 
-app.MapPost(
-    "/api/summarize",
-    async (
-        SummarizeRequest request,
-        ISummarizationService summarizationService
-    ) =>
+app.MapPost("/api/summarize", async (
+    SummarizeRequest request,
+    ISummarizationService summarizationService,
+    ILogger<Program> logger) =>
 {
-    if (string.IsNullOrWhiteSpace(
-        request.Transcript))
+    if (string.IsNullOrWhiteSpace(request.Transcript))
     {
-        return Results.BadRequest(new
-        {
-            error = "Transcript boş olamaz."
-        });
+        return Results.BadRequest(new { error = "Transcript boş olamaz." });
     }
 
     try
     {
-        var summary =
-            await summarizationService
-                .SummarizeAsync(
-                    request.Transcript);
+        var summary = await summarizationService.SummarizeAsync(request.Transcript);
 
-        return Results.Ok(
-            new SummarizeResponse(summary));
+        return Results.Ok(new SummarizeResponse
+        {
+            GeneralSummary = summary.GeneralSummary,
+            Decisions = summary.Decisions,
+            ActionItems = summary.ActionItems
+        });
     }
     catch (Exception ex)
     {
-        Console.WriteLine(
-            $"Özetleme hatası: {ex.Message}"
-        );
-
+        logger.LogError(ex, "Özetleme sırasında hata oluştu.");
         return Results.Problem(
             title: "Özetleme başarısız",
-            detail: ex.Message
+            detail: ex.Message,
+            statusCode: 500
         );
     }
 });
@@ -173,8 +167,11 @@ record WeatherForecast(
         32 + (int)(TemperatureC / 0.5556);
 }
 
-public record SummarizeRequest(
-    string Transcript);
+public record SummarizeRequest(string Transcript);
 
-public record SummarizeResponse(
-    string Summary);
+public class SummarizeResponse
+{
+    public string GeneralSummary { get; set; } = string.Empty;
+    public List<string> Decisions { get; set; } = new();
+    public List<string> ActionItems { get; set; } = new();
+}
