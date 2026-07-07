@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Recorder } from "./components/Recorder";
+import { MeetingHistory } from "./components/MeetingHistory";
 
 function App() {
   const [message, setMessage] = useState("Yükleniyor...");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     fetch("http://localhost:5166/api/ping")
@@ -16,6 +18,9 @@ function App() {
         setMessage("API bağlantı hatası");
       });
   }, []);
+  function handleMeetingSaved() {
+  setRefreshKey((prev) => prev + 1);
+}
 
   return (
     <div
@@ -32,7 +37,9 @@ function App() {
         <p>Backend mesajı: {message}</p>
       </div>
 
-      <Recorder />
+      <Recorder onMeetingSaved={handleMeetingSaved} />
+
+      <MeetingHistory refreshKey={refreshKey} />
     </div>
   );
 }

@@ -21,18 +21,31 @@ public class PlainTextSummarizationService : ISummarizationService
 
         var summary = new MeetingSummary
         {
-            GeneralSummary = "Toplantıda proje ilerleyişi konuşuldu.",
+            GeneralSummary =
+@"# Genel Özet
+
+Toplantıda proje ilerleyişi konuşuldu.
+
+## Kararlar
+
+- Whisper.NET kullanılacak.
+- Backend ASP.NET Core Minimal API olacak.
+
+## Yapılacaklar
+
+- Claude API eklenecek.
+- PDF export hazırlanacak.",
 
             Decisions = new List<string>
             {
-                "Whisper kullanılacak.",
-                "Backend .NET olacak."
+                "Whisper.NET kullanılacak.",
+                "Backend ASP.NET Core Minimal API olacak."
             },
 
             ActionItems = new List<string>
             {
                 "Claude API eklenecek.",
-                "PDF export yapılacak."
+                "PDF export hazırlanacak."
             }
         };
 

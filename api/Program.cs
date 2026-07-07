@@ -1,4 +1,5 @@
 using api.Services.MeetingService;
+using api.Options;
 using api.Data;
 using Microsoft.EntityFrameworkCore;
 using api.Services;
@@ -39,6 +40,11 @@ builder.Services.AddScoped<
     IMeetingService,
     MeetingService>();
 // app.UseHttpsRedirection();
+
+builder.Services.Configure<ClaudeOptions>(
+    builder.Configuration.GetSection(
+        ClaudeOptions.SectionName
+    ));
 
 var app = builder.Build();
 

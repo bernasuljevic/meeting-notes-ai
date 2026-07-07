@@ -1,30 +1,45 @@
 // web/src/components/Recorder.tsx
+
+import { SaveMeetingPanel } from "./SaveMeetingPanel";
 import { LevelMeter } from "./LevelMeter";
 import { useEffect, useState } from "react";
 import { useRecorder } from "../hooks/useRecorder";
 import {
   transcribeAudio,
   summarizeTranscript,
+  createMeeting,
 } from "../lib/api";
 
-import type {
-  SummarizeResponse,
-} from "../lib/api";
+import type { SummarizeResponse } from "../lib/api";
 
 import { TranscriptPanel } from "./TranscriptPanel";
 import { NotesPanel } from "./NotesPanel";
 
-export function Recorder() {
-  const { isRecording, level, audioBlob, error, startRecording, stopRecording } = useRecorder();
+interface RecorderProps {
+  onMeetingSaved?: () => void;
+}
+
+export function Recorder({
+  onMeetingSaved,
+}: RecorderProps) {
+  const {
+    isRecording,
+    level,
+    audioBlob,
+    error,
+    startRecording,
+    stopRecording,
+  } = useRecorder();
 
   const [transcript, setTranscript] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
 
-  // --- GÜNCELLENDİ: summary artık düz string değil, yapılandırılmış nesne ---
   const [summary, setSummary] = useState<SummarizeResponse | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summarizeError, setSummarizeError] = useState<string | null>(null);
+
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!audioBlob) {
@@ -39,15 +54,21 @@ export function Recorder() {
       setTranscript(null);
       setSummary(null);
       setSummarizeError(null);
+      setSaveSuccess(null);
 
       try {
         const result = await transcribeAudio(audioBlob!);
+
         if (!isCancelled) {
           setTranscript(result.transcript);
         }
       } catch (err) {
         if (!isCancelled) {
-          const message = err instanceof Error ? err.message : "Transkripsiyon başarısız.";
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Transkripsiyon başarısız.";
+
           setTranscribeError(message);
         }
       } finally {
@@ -76,16 +97,55 @@ export function Recorder() {
       const result = await summarizeTranscript(transcript);
       setSummary(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Özetleme başarısız.";
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Özetleme başarısız.";
+
       setSummarizeError(message);
     } finally {
       setIsSummarizing(false);
     }
   }
 
+  async function handleSaveMeeting(title: string) {
+    if (!transcript || !summary) {
+      return;
+    }
+
+    setSaveSuccess(null);
+
+    try {
+      const result = await createMeeting({
+        title,
+        startedAt: new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        transcript,
+        summary,
+      });
+
+      console.log("Toplantı kaydedildi:", result.id);
+
+      onMeetingSaved?.();
+
+      setSaveSuccess("Toplantı başarıyla kaydedildi.");
+    } catch (err) {
+      setSaveSuccess(null);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Toplantı kaydedilemedi.";
+
+      alert(message);
+    }
+  }
+
   return (
     <div className="flex flex-col items-center gap-4 p-6">
-      <h2 className="text-xl font-semibold">Ses Kaydı</h2>
+      <h2 className="text-xl font-semibold">
+        Ses Kaydı
+      </h2>
 
       <div className="flex gap-3">
         <button
@@ -95,6 +155,7 @@ export function Recorder() {
         >
           Start Recording
         </button>
+
         <button
           onClick={stopRecording}
           disabled={!isRecording}
@@ -105,37 +166,51 @@ export function Recorder() {
       </div>
 
       <LevelMeter
-  level={level}
-  isRecording={isRecording}
-/>
+        level={level}
+        isRecording={isRecording}
+      />
 
+      {error && (
+        <p className="text-red-600 text-sm">
+          Kayıt hatası: {error}
+        </p>
+      )}
 
-      {error && <p className="text-red-600 text-sm">Kayıt hatası: {error}</p>}
+      <TranscriptPanel
+        transcript={transcript}
+        isTranscribing={isTranscribing}
+        error={transcribeError}
+      />
 
-<TranscriptPanel
-  transcript={transcript}
-  isTranscribing={isTranscribing}
-  error={transcribeError}
-/>
+      {transcript && (
+        <button
+          onClick={handleSummarize}
+          disabled={isSummarizing}
+          className="px-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50"
+        >
+          {isSummarizing
+            ? "Özetleniyor..."
+            : "Özet Oluştur"}
+        </button>
+      )}
 
-{transcript && (
-  <button
-    onClick={handleSummarize}
-    disabled={isSummarizing}
-    className="px-4 py-2 bg-gray-800 text-white rounded disabled:opacity-50"
-  >
-    {isSummarizing
-      ? "Özetleniyor..."
-      : "Özet Oluştur"}
-  </button>
-)}
+      <NotesPanel
+        summary={summary}
+        isSummarizing={isSummarizing}
+        error={summarizeError}
+      />
 
-<NotesPanel
-  summary={summary}
-  isSummarizing={isSummarizing}
-  error={summarizeError}
-/>
+      {summary && (
+        <SaveMeetingPanel
+          onSave={handleSaveMeeting}
+        />
+      )}
 
+      {saveSuccess && (
+        <div className="w-full max-w-md rounded border border-green-300 bg-green-50 p-3 text-green-700 text-sm">
+          ✓ {saveSuccess}
+        </div>
+      )}
     </div>
   );
 }

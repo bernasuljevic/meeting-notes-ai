@@ -71,3 +71,90 @@ export async function summarizeTranscript(transcript: string): Promise<Summarize
 
   return response.json();
 }
+export interface MeetingListItem {
+  id: string;
+  title: string;
+  startedAt: string;
+  endedAt: string | null;
+  createdAt: string;
+}
+
+export async function getMeetings(): Promise<MeetingListItem[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/meetings`
+  );
+
+  if (!response.ok) {
+    throw new Error("Toplantılar alınamadı.");
+  }
+
+  return await response.json();
+}
+export interface TranscriptSegment {
+  id: string;
+  seq: number;
+  text: string;
+}
+
+export interface MeetingNote {
+  id: string;
+  markdownContent: string;
+  model: string;
+  createdAt: string;
+}
+
+export interface MeetingDetail {
+  id: string;
+  title: string;
+  startedAt: string;
+  endedAt: string | null;
+  createdAt: string;
+  transcriptSegments: TranscriptSegment[];
+  notes: MeetingNote[];
+}
+
+export async function getMeeting(
+  id: string
+): Promise<MeetingDetail> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/meetings/${id}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Toplantı bulunamadı.");
+  }
+
+  return await response.json();
+}
+export interface CreateMeetingRequest {
+  title: string;
+  startedAt: string;
+  endedAt: string | null;
+  transcript: string;
+  summary: SummarizeResponse;
+}
+
+export interface CreateMeetingResponse {
+  id: string;
+}
+
+export async function createMeeting(
+  request: CreateMeetingRequest
+): Promise<CreateMeetingResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/meetings`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Toplantı kaydedilemedi.");
+  }
+
+  return await response.json();
+}
