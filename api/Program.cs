@@ -1,3 +1,4 @@
+using api.Services.MeetingService;
 using api.Data;
 using Microsoft.EntityFrameworkCore;
 using api.Services;
@@ -34,7 +35,13 @@ builder.Services.AddCors(options =>
 // Add services to the container.
 builder.Services.AddOpenApi();
 
+builder.Services.AddScoped<
+    IMeetingService,
+    MeetingService>();
+// app.UseHttpsRedirection();
+
 var app = builder.Build();
+
 
 // Whisper modelini uygulama açılışında yükle
 app.Services.GetRequiredService<TranscriptionService>();
@@ -46,8 +53,6 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-// app.UseHttpsRedirection();
 
 var summaries = new[]
 {
@@ -162,6 +167,22 @@ app.MapPost("/api/summarize", async (
             statusCode: 500
         );
     }
+});
+
+app.MapPost(
+    "/api/meetings",
+    async (
+        CreateMeetingRequest request,
+        IMeetingService meetingService
+    ) =>
+{
+    var meeting =
+        await meetingService.CreateMeetingAsync(request);
+
+    return Results.Ok(new
+    {
+        meeting.Id
+    });
 });
 
 app.Run();
