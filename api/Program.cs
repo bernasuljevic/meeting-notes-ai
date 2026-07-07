@@ -185,6 +185,36 @@ app.MapPost(
     });
 });
 
+app.MapGet(
+    "/api/meetings",
+    async (
+        IMeetingService meetingService
+    ) =>
+{
+    var meetings =
+        await meetingService.GetMeetingsAsync();
+
+    return Results.Ok(meetings);
+});
+
+app.MapGet(
+    "/api/meetings/{id:guid}",
+    async (
+        Guid id,
+        IMeetingService meetingService
+    ) =>
+{
+    var meeting =
+        await meetingService.GetMeetingAsync(id);
+
+    if (meeting is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(meeting);
+});
+
 app.Run();
 
 record WeatherForecast(

@@ -1,4 +1,6 @@
 using api.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace api.Services.MeetingService;
 
@@ -50,16 +52,51 @@ public class MeetingService : IMeetingService
     return meeting;
 }
 
-public Task<List<MeetingListItemDto>> GetMeetingsAsync(
+public async Task<List<MeetingListItemDto>> GetMeetingsAsync(
     CancellationToken cancellationToken = default)
 {
-    throw new NotImplementedException();
+    return await _context.Meetings
+        .OrderByDescending(m => m.CreatedAt)
+        .Select(m => new MeetingListItemDto(
+            m.Id,
+            m.Title,
+            m.StartedAt,
+            m.EndedAt,
+            m.CreatedAt
+        ))
+        .ToListAsync(cancellationToken);
 }
-
-public Task<MeetingDetailDto?> GetMeetingAsync(
+public async Task<MeetingDetailDto?> GetMeetingAsync(
     Guid id,
     CancellationToken cancellationToken = default)
 {
-    throw new NotImplementedException();
+    return await _context.Meetings
+        .Where(m => m.Id == id)
+        .Select(m => new MeetingDetailDto(
+            m.Id,
+            m.Title,
+            m.StartedAt,
+            m.EndedAt,
+            m.CreatedAt,
+
+            m.TranscriptSegments
+                .OrderBy(t => t.Seq)
+                .Select(t => new TranscriptSegmentDto(
+                    t.Id,
+                    t.Seq,
+                    t.Text
+                ))
+                .ToList(),
+
+            m.Notes
+                .Select(n => new MeetingNoteDto(
+                    n.Id,
+                    n.MarkdownContent,
+                    n.Model,
+                    n.CreatedAt
+                ))
+                .ToList()
+        ))
+        .FirstOrDefaultAsync(cancellationToken);
 }
 }
