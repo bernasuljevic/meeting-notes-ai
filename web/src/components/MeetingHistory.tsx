@@ -1,34 +1,47 @@
+// web/src/components/MeetingHistory.tsx
+
+import { Trash2 } from "lucide-react";
+import { deleteMeeting } from "../lib/api";
 import { useEffect, useState } from "react";
 import {
-  getMeetings,
-  getMeeting,
-  type MeetingListItem,
-  type MeetingDetail,
-} from "../lib/api";
+  CalendarDays,
+  Clock3,
+  FolderOpen,
+  Loader2,
+} from "lucide-react";
 
-import { MeetingDetail as MeetingDetailComponent } from "./MeetingDetail";
+import {
+  getMeetings,
+  type MeetingListItem,
+} from "../lib/api";
 
 interface MeetingHistoryProps {
   refreshKey: number;
+  selectedMeetingId: string | null;
+  onMeetingSelect: (id: string) => void;
+  onMeetingDeleted: () => void;
 }
 
 export function MeetingHistory({
   refreshKey,
+  selectedMeetingId,
+  onMeetingSelect,
+  onMeetingDeleted,
 }: MeetingHistoryProps) {
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
-  const [selectedMeeting, setSelectedMeeting] =
-    useState<MeetingDetail | null>(null);
-
-  const [loadingMeeting, setLoadingMeeting] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadMeetings() {
       try {
+        setLoading(true);
+
         const result = await getMeetings();
+
         setMeetings(result);
+        setError(null);
       } catch (err) {
         setError(
           err instanceof Error
@@ -43,91 +56,174 @@ export function MeetingHistory({
     loadMeetings();
   }, [refreshKey]);
 
-  async function handleMeetingClick(id: string) {
+  async function handleDelete(
+    e: React.MouseEvent,
+    id: string
+  ) {
+    e.stopPropagation();
+
+    if (
+      !window.confirm(
+        "Bu toplantıyı silmek istediğine emin misin? Bu işlem geri alınamaz."
+      )
+    ) {
+      return;
+    }
+
     try {
-      setLoadingMeeting(true);
-
-      const meeting = await getMeeting(id);
-
-      console.log("Meeting:", meeting);
-      console.log("Transcript:", meeting.transcriptSegments);
-      console.log("Notes:", meeting.notes);
-
-      setSelectedMeeting(meeting);
+      setDeletingId(id);
+      await deleteMeeting(id);
+      onMeetingDeleted();
     } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : "Toplantı yüklenemedi."
+      setError(
+        err instanceof Error ? err.message : "Toplantı silinemedi."
       );
     } finally {
-      setLoadingMeeting(false);
+      setDeletingId(null);
     }
   }
 
-  if (loading) {
-    return <p>Toplantılar yükleniyor...</p>;
-  }
-
-  if (error) {
-    return (
-      <p className="text-red-500">
-        {error}
-      </p>
-    );
-  }
-
   return (
-    <div className="w-full max-w-3xl rounded border border-gray-300 p-4">
-      <h2 className="text-xl font-semibold mb-4">
-        Toplantı Geçmişi
-      </h2>
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
 
-      {meetings.length === 0 ? (
-        <p>Henüz toplantı bulunmuyor.</p>
-      ) : (
-        <div className="space-y-3">
+      <div className="border-b border-slate-200 bg-gradient-to-r from-slate-900 to-blue-900 px-6 py-5">
+
+        <div className="flex items-center gap-3">
+
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+
+            <FolderOpen className="h-5 w-5 text-white" />
+
+          </div>
+
+          <div>
+
+            <h2 className="text-xl font-bold text-white">
+              Toplantılar
+            </h2>
+
+            <p className="text-sm text-slate-300">
+              Kaydedilen toplantılar
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {loading && (
+
+        <div className="flex items-center justify-center gap-3 p-10 text-slate-500">
+
+          <Loader2 className="h-5 w-5 animate-spin" />
+
+          Toplantılar yükleniyor...
+
+        </div>
+
+      )}
+
+      {error && (
+
+        <div className="p-6 text-red-600">
+          {error}
+        </div>
+
+      )}
+
+      {!loading && !error && meetings.length === 0 && (
+
+        <div className="p-10 text-center text-slate-500">
+
+          Henüz kayıtlı toplantı bulunmuyor.
+
+        </div>
+
+      )}
+
+      {!loading && !error && meetings.length > 0 && (
+
+        <div className="max-h-[75vh] overflow-y-auto">
+
           {meetings.map((meeting) => {
-            const isSelected = selectedMeeting?.id === meeting.id;
+
+            const isSelected =
+              selectedMeetingId === meeting.id;
+
+            const isDeleting = deletingId === meeting.id;
 
             return (
+
               <div
                 key={meeting.id}
-                onClick={() => handleMeetingClick(meeting.id)}
-                className={`rounded border p-4 cursor-pointer transition-all shadow-sm ${
-                  isSelected
-                    ? "border-blue-500 bg-blue-50 shadow-md"
-                    : "border-gray-300 hover:bg-gray-50 hover:shadow-md"
-                }`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onMeetingSelect(meeting.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    onMeetingSelect(meeting.id);
+                  }
+                }}
+                className={`group relative w-full cursor-pointer border-b border-slate-100 p-5 text-left transition-all duration-200
+
+${
+  isSelected
+    ? "border-l-4 border-l-blue-600 bg-blue-50"
+    : "hover:bg-slate-50"
+}`}
               >
-                <h3 className="text-lg font-semibold">
+
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(e, meeting.id)}
+                  disabled={isDeleting}
+                  aria-label="Toplantıyı sil"
+                  className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </button>
+
+                <h3 className="truncate pr-8 text-base font-semibold text-slate-800">
                   {meeting.title}
                 </h3>
 
-                <p className="mt-2 text-sm text-gray-500">
-                  <span className="font-medium">Başlangıç:</span>{" "}
-                  {new Date(meeting.startedAt).toLocaleString()}
-                </p>
+                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
 
-                {meeting.endedAt && (
-                  <p className="text-sm text-gray-500">
-                    <span className="font-medium">Bitiş:</span>{" "}
-                    {new Date(meeting.endedAt).toLocaleString()}
-                  </p>
-                )}
+                  <CalendarDays className="h-4 w-4" />
+
+                  {new Date(
+                    meeting.startedAt
+                  ).toLocaleDateString("tr-TR")}
+
+                </div>
+
+                <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+
+                  <Clock3 className="h-4 w-4" />
+
+                  {new Date(
+                    meeting.startedAt
+                  ).toLocaleTimeString("tr-TR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+
+                </div>
+
               </div>
+
             );
           })}
+
         </div>
+
       )}
 
-      {loadingMeeting && (
-        <p className="mt-4">
-          Toplantı yükleniyor...
-        </p>
-      )}
-
-      <MeetingDetailComponent meeting={selectedMeeting} />
     </div>
   );
 }

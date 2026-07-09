@@ -221,6 +221,29 @@ app.MapGet(
     return Results.Ok(meeting);
 });
 
+app.MapDelete("/api/meetings/{id:guid}", async (
+    Guid id,
+    AppDbContext db) =>
+{
+    var meeting = await db.Meetings
+        .Include(m => m.TranscriptSegments)
+        .Include(m => m.Notes)
+        .FirstOrDefaultAsync(m => m.Id == id);
+
+    if (meeting is null)
+    {
+        return Results.NotFound();
+    }
+
+    db.TranscriptSegments.RemoveRange(meeting.TranscriptSegments);
+    db.MeetingNotes.RemoveRange(meeting.Notes);
+    db.Meetings.Remove(meeting);
+
+    await db.SaveChangesAsync();
+
+    return Results.NoContent();
+});
+
 app.Run();
 
 record WeatherForecast(

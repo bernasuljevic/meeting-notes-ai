@@ -112,6 +112,18 @@ export interface MeetingDetail {
   transcriptSegments: TranscriptSegment[];
   notes: MeetingNote[];
 }
+export async function deleteMeeting(id: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/meetings/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Toplantı silinemedi.");
+  }
+}
 
 export async function getMeeting(
   id: string
