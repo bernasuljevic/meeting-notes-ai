@@ -1,23 +1,22 @@
 // web/src/components/Recorder.tsx
-import { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  CheckCircle2,
   Circle,
+  Clock3,
+  Info,
   Loader2,
   Mic,
-  Sparkles,
   Square,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useRecorder } from "../hooks/useRecorder";
-import {
-  transcribeAudio,
-  summarizeTranscript,
-  createMeeting,
-} from "../lib/api";
+import { createMeeting } from "../lib/api";
 
-import type { SummarizeResponse } from "../lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 import { LevelMeter } from "./LevelMeter";
 import { NotesPanel } from "./NotesPanel";
@@ -28,96 +27,33 @@ interface RecorderProps {
   onMeetingSaved?: () => void;
 }
 
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds
+    .toString()
+    .padStart(2, "0")}`;
+}
+
 export function Recorder({ onMeetingSaved }: RecorderProps) {
   const {
     isRecording,
+    isFinalizing,
     level,
-    audioBlob,
+    durationSec,
+    transcript,
+    notes,
     error,
     startRecording,
     stopRecording,
   } = useRecorder();
 
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcribeError, setTranscribeError] = useState<string | null>(null);
-
-  const [summary, setSummary] = useState<SummarizeResponse | null>(null);
-
-  const [isSummarizing, setIsSummarizing] = useState(false);
-
-  const [summarizeError, setSummarizeError] = useState<string | null>(null);
-
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!audioBlob) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    async function sendForTranscription() {
-      setIsTranscribing(true);
-      setTranscribeError(null);
-      setTranscript(null);
-      setSummary(null);
-      setSummarizeError(null);
-      setSaveSuccess(null);
-
-      try {
-        const result = await transcribeAudio(audioBlob!);
-
-        if (!isCancelled) {
-          setTranscript(result.transcript);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setTranscribeError(
-            err instanceof Error
-              ? err.message
-              : "Transkripsiyon başarısız."
-          );
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsTranscribing(false);
-        }
-      }
-    }
-
-    sendForTranscription();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [audioBlob]);
-
-  async function handleSummarize() {
-    if (!transcript) return;
-
-    setIsSummarizing(true);
-    setSummarizeError(null);
-
-    try {
-      const result = await summarizeTranscript(transcript);
-
-      setSummary(result);
-    } catch (err) {
-      setSummarizeError(
-        err instanceof Error ? err.message : "Özetleme başarısız."
-      );
-    } finally {
-      setIsSummarizing(false);
-    }
-  }
+  const hasTranscript = transcript.length > 0;
 
   async function handleSaveMeeting(title: string) {
-    if (!transcript || !summary) {
+    if (!transcript || !notes) {
       return;
     }
-
-    setSaveSuccess(null);
 
     try {
       const result = await createMeeting({
@@ -125,18 +61,16 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
         startedAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
         transcript,
-        summary,
+        summary: notes,
       });
 
       console.log("Toplantı kaydedildi:", result.id);
 
       onMeetingSaved?.();
 
-      setSaveSuccess("Toplantı başarıyla kaydedildi.");
+      toast.success("Toplantı başarıyla kaydedildi.");
     } catch (err) {
-      setSaveSuccess(null);
-
-      alert(
+      toast.error(
         err instanceof Error ? err.message : "Toplantı kaydedilemedi."
       );
     }
@@ -145,7 +79,7 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
   return (
     <div className="space-y-8">
       {/* Kayıt Kartı */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+      <Card className="overflow-hidden py-0 shadow-sm transition-shadow hover:shadow-md">
         {/* Gradient başlık alanı */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-slate-900 px-6 py-8 sm:px-10 sm:py-10">
           <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
@@ -163,57 +97,82 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
               </div>
 
               <p className="mt-3 max-w-md text-sm leading-relaxed text-blue-50/90">
-                Kaydı başlatın, transkripti otomatik oluşturun ve yapay
-                zekâ ile saniyeler içinde özetleyin.
+                Kaydı başlatın, transkript canlı olarak oluşsun; kaydı
+                bitirdiğinizde yapay zekâ otomatik olarak özetlesin.
               </p>
             </div>
 
             {/* Canlı durum göstergesi */}
-            <div
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium backdrop-blur-sm transition-colors ${
-                isRecording
-                  ? "bg-red-500/20 text-red-50"
-                  : "bg-white/10 text-blue-50/80"
-              }`}
+            <Badge
+              variant={isRecording ? "destructive" : "secondary"}
+              className="gap-2 rounded-full px-4 py-2 text-sm font-medium backdrop-blur-sm"
             >
               <Circle
-                className={`h-2.5 w-2.5 ${
-                  isRecording
-                    ? "fill-red-400 text-red-400 animate-pulse"
-                    : "fill-slate-300 text-slate-300"
+                className={`h-2.5 w-2.5 fill-current ${
+                  isRecording ? "animate-pulse" : ""
                 }`}
               />
               {isRecording ? "Kayıt Yapılıyor..." : "Hazır"}
-            </div>
+            </Badge>
           </div>
         </div>
 
         {/* Kontroller */}
-        <div className="space-y-6 px-6 py-8 sm:px-10">
-          <div className="flex flex-wrap gap-4">
-            <button
+        <CardContent className="space-y-6 px-6 py-8 sm:px-10">
+          {/* KVKK / gizlilik bilgilendirmesi */}
+          <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-700">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Bu toplantı kaydedilmektedir. Katılımcıları bilgilendirin ve
+              gerekiyorsa (özellikle müşteri toplantılarında) rızalarını alın.
+              Ses, transkript oluşturmak için kendi cihazınızda işlenir; yapay
+              zekâ özeti aktif olduğunda transkript metni, özet oluşturmak
+              amacıyla Claude API'ye (Anthropic) gönderilir.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <Button
               onClick={startRecording}
               disabled={isRecording}
-              className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-md disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+              size="lg"
+              className="gap-2"
             >
-              <Mic className="h-4 w-4 transition-transform group-hover:scale-110" />
+              <Mic className="h-4 w-4" />
               Kaydı Başlat
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={stopRecording}
               disabled={!isRecording}
-              className="group inline-flex items-center gap-2 rounded-xl bg-red-600 px-6 py-3.5 font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-md disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+              variant="destructive"
+              size="lg"
+              className="gap-2"
             >
-              <Square className="h-4 w-4 transition-transform group-hover:scale-110" />
+              <Square className="h-4 w-4" />
               Kaydı Durdur
-            </button>
+            </Button>
+
+            {/* Süre göstergesi */}
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-600">
+              <Clock3 className="h-4 w-4" />
+              {formatDuration(durationSec)}
+            </div>
           </div>
+
+          <Separator />
 
           {/* Ses seviyesi kartı */}
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
             <LevelMeter level={level} isRecording={isRecording} />
           </div>
+
+          {isFinalizing && (
+            <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              <p>Son parçalar işleniyor ve yapay zekâ özeti oluşturuluyor...</p>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -221,53 +180,24 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
               <p>{error}</p>
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Transkript */}
+      {/* Transkript (canlı) */}
       <TranscriptPanel
-        transcript={transcript}
-        isTranscribing={isTranscribing}
-        error={transcribeError}
+        transcript={hasTranscript ? transcript : null}
+        isTranscribing={isRecording || isFinalizing}
+        error={null}
       />
 
-      {transcript && (
-        <div className="flex justify-center">
-          <button
-            onClick={handleSummarize}
-            disabled={isSummarizing}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-3.5 font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
-          >
-            {isSummarizing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Özetleniyor...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                Yapay Zekâ Özeti Oluştur
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Notlar / Özet */}
+      {/* Notlar / Özet (otomatik oluşur) */}
       <NotesPanel
-        summary={summary}
-        isSummarizing={isSummarizing}
-        error={summarizeError}
+        summary={notes}
+        isSummarizing={isFinalizing}
+        error={error}
       />
 
-      {summary && <SaveMeetingPanel onSave={handleSaveMeeting} />}
-
-      {saveSuccess && (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800 shadow-sm">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-          <p className="font-medium">{saveSuccess}</p>
-        </div>
-      )}
+      {notes && <SaveMeetingPanel onSave={handleSaveMeeting} />}
     </div>
   );
 }

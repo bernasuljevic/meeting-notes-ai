@@ -1,19 +1,20 @@
-// web/src/lib/api.ts
-
-const API_BASE_URL = "http://localhost:5166";
+const API_BASE_URL = "";
 
 export interface TranscribeResponse {
+  seq: number;
   fileName: string;
-  sizeBytes: number;
+  size: number;
   transcript: string;
 }
 
 /**
- * Kaydedilen ses blob'unu backend'e gönderir ve Whisper transkripsiyonunu döner.
+ * Kaydedilen ses parçasını (chunk) backend'e gönderir ve Whisper transkripsiyonunu döner.
+ * `seq`, parçaların doğru sırayla birleştirilebilmesi için zorunlu.
  */
-export async function transcribeAudio(audioBlob: Blob): Promise<TranscribeResponse> {
+export async function transcribeAudio(audioBlob: Blob, seq: number): Promise<TranscribeResponse> {
   const formData = new FormData();
   formData.append("audio", audioBlob, "recording.wav");
+  formData.append("seq", String(seq));
 
   const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
     method: "POST",
@@ -24,7 +25,7 @@ export async function transcribeAudio(audioBlob: Blob): Promise<TranscribeRespon
     let detail = `İstek başarısız: ${response.status}`;
     try {
       const errorBody = await response.json();
-      detail = errorBody.detail ?? errorBody.error ?? detail;
+      detail = errorBody.detail ?? errorBody.error ?? errorBody.message ?? detail;
     } catch {
       // JSON parse edilemezse, varsayılan mesajı kullan
     }
@@ -34,21 +35,14 @@ export async function transcribeAudio(audioBlob: Blob): Promise<TranscribeRespon
   return response.json();
 }
 
-// --- YENİ EKLENEN / GÜNCELLENEN KISIM: Yapılandırılmış özet ---
-
 export interface SummarizeResponse {
   generalSummary: string;
   decisions: string[];
   actionItems: string[];
+  openIssuesAndRisks: string[];
+  keyDiscussionPoints: string[];
 }
 
-/**
- * Transcript metnini backend'e gönderir, yapılandırılmış toplantı özeti döner
- * (genel özet + kararlar + yapılacaklar).
- * Şimdilik backend gerçek AI özetlemesi yapmıyor (placeholder), sabit örnek
- * veri döndürüyor. İleride Claude API bağlanınca bu fonksiyon DEĞİŞMEYECEK,
- * sadece backend tarafında gerçek AI çıktısı dönmeye başlayacak.
- */
 export async function summarizeTranscript(transcript: string): Promise<SummarizeResponse> {
   const response = await fetch(`${API_BASE_URL}/api/summarize`, {
     method: "POST",
@@ -71,6 +65,7 @@ export async function summarizeTranscript(transcript: string): Promise<Summarize
 
   return response.json();
 }
+
 export interface MeetingListItem {
   id: string;
   title: string;
@@ -80,9 +75,7 @@ export interface MeetingListItem {
 }
 
 export async function getMeetings(): Promise<MeetingListItem[]> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/meetings`
-  );
+  const response = await fetch(`${API_BASE_URL}/api/meetings`);
 
   if (!response.ok) {
     throw new Error("Toplantılar alınamadı.");
@@ -90,6 +83,7 @@ export async function getMeetings(): Promise<MeetingListItem[]> {
 
   return await response.json();
 }
+
 export interface TranscriptSegment {
   id: string;
   seq: number;
@@ -112,25 +106,19 @@ export interface MeetingDetail {
   transcriptSegments: TranscriptSegment[];
   notes: MeetingNote[];
 }
+
 export async function deleteMeeting(id: string) {
-  const response = await fetch(
-    `${API_BASE_URL}/api/meetings/${id}`,
-    {
-      method: "DELETE",
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}`, {
+    method: "DELETE",
+  });
 
   if (!response.ok) {
     throw new Error("Toplantı silinemedi.");
   }
 }
 
-export async function getMeeting(
-  id: string
-): Promise<MeetingDetail> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/meetings/${id}`
-  );
+export async function getMeeting(id: string): Promise<MeetingDetail> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}`);
 
   if (!response.ok) {
     throw new Error("Toplantı bulunamadı.");
@@ -138,6 +126,7 @@ export async function getMeeting(
 
   return await response.json();
 }
+
 export interface CreateMeetingRequest {
   title: string;
   startedAt: string;
@@ -150,19 +139,14 @@ export interface CreateMeetingResponse {
   id: string;
 }
 
-export async function createMeeting(
-  request: CreateMeetingRequest
-): Promise<CreateMeetingResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/meetings`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    }
-  );
+export async function createMeeting(request: CreateMeetingRequest): Promise<CreateMeetingResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
 
   if (!response.ok) {
     throw new Error("Toplantı kaydedilemedi.");

@@ -7,7 +7,7 @@ import {
   type MeetingDetail as MeetingDetailModel,
 } from "./lib/api";
 
-const API_BASE_URL = "http://localhost:5166";
+const API_BASE_URL = "";
 
 function App() {
   const [apiMessage, setApiMessage] = useState("Bağlanıyor...");
@@ -114,11 +114,13 @@ function App() {
             refreshKey={refreshKey}
             selectedMeetingId={selectedMeetingId}
             onMeetingSelect={setSelectedMeetingId}
-            onMeetingDeleted={() => {
-                setRefreshKey((x) => x + 1);
-                setSelectedMeetingId(null);
-    }}
-/>
+            onMeetingDeleted={(deletedId) => {
+              setRefreshKey((x) => x + 1);
+              setSelectedMeetingId((current) =>
+                current === deletedId ? null : current
+              );
+            }}
+          />
 
         </aside>
 

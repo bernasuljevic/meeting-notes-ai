@@ -7,4 +7,8 @@ public class MeetingSummary
     public List<string> Decisions { get; set; } = new();
 
     public List<string> ActionItems { get; set; } = new();
+
+    public List<string> OpenIssuesAndRisks { get; set; } = new();
+
+    public List<string> KeyDiscussionPoints { get; set; } = new();
 }

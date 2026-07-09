@@ -15,38 +15,29 @@ public class PlainTextSummarizationService : ISummarizationService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "PlainTextSummarizationService kullanılıyor. Transcript uzunluğu: {Length}",
+            "PlainTextSummarizationService kullanılıyor (placeholder — Claude API entegrasyonu bekleniyor). Transcript uzunluğu: {Length}",
             transcript.Length
         );
+
+        var preview = transcript.Length > 200
+            ? transcript[..200] + "…"
+            : transcript;
 
         var summary = new MeetingSummary
         {
             GeneralSummary =
-@"# Genel Özet
+$@"Genel Özet (yer tutucu)
 
-Toplantıda proje ilerleyişi konuşuldu.
+Bu not gerçek bir LLM özetlemesi değildir — Claude API entegrasyonu eklenene kadar geçici bir yer tutucudur.
 
-## Kararlar
+Alınan transkript ({transcript.Length} karakter):
 
-- Whisper.NET kullanılacak.
-- Backend ASP.NET Core Minimal API olacak.
+""{preview}""",
 
-## Yapılacaklar
-
-- Claude API eklenecek.
-- PDF export hazırlanacak.",
-
-            Decisions = new List<string>
-            {
-                "Whisper.NET kullanılacak.",
-                "Backend ASP.NET Core Minimal API olacak."
-            },
-
-            ActionItems = new List<string>
-            {
-                "Claude API eklenecek.",
-                "PDF export hazırlanacak."
-            }
+            Decisions = new List<string>(),
+            ActionItems = new List<string>(),
+            OpenIssuesAndRisks = new List<string>(),
+            KeyDiscussionPoints = new List<string>()
         };
 
         return Task.FromResult(summary);

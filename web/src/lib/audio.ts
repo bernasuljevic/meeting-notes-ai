@@ -1,26 +1,19 @@
 // web/src/lib/audio.ts
 
 /**
- * Ham ses verisini verilen giriş örnekleme hızından
- * hedef örnekleme hızına düşürür (downsample).
- * Örnek: 48000 Hz -> 16000 Hz
+ * Tarayıcının doğal örnekleme hızından (genelde 48000 Hz),
+ * Whisper'ın beklediği hıza (16000 Hz) düşürür.
  */
 export function downsampleBuffer(
   buffer: Float32Array,
-  inputSampleRate: number,
-  outputSampleRate: number
+  sampleRate: number,
+  outSampleRate: number
 ): Float32Array {
-  if (outputSampleRate === inputSampleRate) {
+  if (outSampleRate === sampleRate) {
     return buffer;
   }
 
-  if (outputSampleRate > inputSampleRate) {
-    throw new Error(
-      "Hedef örnekleme hızı giriş örnekleme hızından büyük olamaz."
-    );
-  }
-
-  const sampleRateRatio = inputSampleRate / outputSampleRate;
+  const sampleRateRatio = sampleRate / outSampleRate;
   const newLength = Math.round(buffer.length / sampleRateRatio);
   const result = new Float32Array(newLength);
 
@@ -28,25 +21,16 @@ export function downsampleBuffer(
   let offsetBuffer = 0;
 
   while (offsetResult < result.length) {
-    const nextOffsetBuffer = Math.round(
-      (offsetResult + 1) * sampleRateRatio
-    );
-
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
     let accum = 0;
     let count = 0;
 
-    for (
-      let i = offsetBuffer;
-      i < nextOffsetBuffer && i < buffer.length;
-      i++
-    ) {
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
       accum += buffer[i];
       count++;
     }
 
-    result[offsetResult] =
-      count > 0 ? accum / count : 0;
-
+    result[offsetResult] = count > 0 ? accum / count : 0;
     offsetResult++;
     offsetBuffer = nextOffsetBuffer;
   }
@@ -55,22 +39,13 @@ export function downsampleBuffer(
 }
 
 /**
- * Birden fazla Float32Array parçasını
- * tek bir büyük diziye birleştirir.
+ * Birden fazla Float32Array parçasını tek bir Float32Array'de birleştirir.
  */
-export function mergeBuffers(
-  buffers: Float32Array[]
-): Float32Array {
-  let totalLength = 0;
-
-  for (const buffer of buffers) {
-    totalLength += buffer.length;
-  }
-
+export function mergeBuffers(buffers: Float32Array[]): Float32Array {
+  const totalLength = buffers.reduce((sum, b) => sum + b.length, 0);
   const result = new Float32Array(totalLength);
 
   let offset = 0;
-
   for (const buffer of buffers) {
     result.set(buffer, offset);
     offset += buffer.length;
@@ -80,117 +55,68 @@ export function mergeBuffers(
 }
 
 /**
- * Ham ses örneklerinden anlık ses seviyesini hesaplar.
- * Sonuç 0 ile 1 arasındadır.
+ * Float32 ses örneklerini, 44 baytlık standart WAV header'ı ile
+ * 16-bit PCM formatında bir Blob'a kodlar.
  */
-export function calculateRMSLevel(
-  samples: Float32Array
-): number {
+export function encodeWAV(samples: Float32Array, sampleRate: number): Blob {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const bytesPerSample = bitsPerSample / 8;
+  const blockAlign = numChannels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = samples.length * bytesPerSample;
+
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  function writeString(offset: number, str: string) {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  }
+
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true); // fmt chunk boyutu
+  view.setUint16(20, 1, true); // PCM formatı
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+/**
+ * Ham ses örneklerinden RMS (root-mean-square) değerini hesaplar.
+ * Sessizlik eşiği (SILENCE_RMS) ile KARŞILAŞTIRMAK için bu ham değeri kullan.
+ */
+export function calculateRMS(samples: Float32Array): number {
   let sum = 0;
 
   for (let i = 0; i < samples.length; i++) {
     sum += samples[i] * samples[i];
   }
 
-  const rms = Math.sqrt(sum / samples.length);
-
-  // UI'da daha görünür olması için büyütüyoruz
-  return Math.min(1, rms * 4);
-}
-
-function writeString(
-  view: DataView,
-  offset: number,
-  str: string
-): void {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(
-      offset + i,
-      str.charCodeAt(i)
-    );
-  }
-}
-
-function floatTo16BitPCM(
-  view: DataView,
-  offset: number,
-  input: Float32Array
-): void {
-  for (
-    let i = 0;
-    i < input.length;
-    i++, offset += 2
-  ) {
-    const s = Math.max(
-      -1,
-      Math.min(1, input[i])
-    );
-
-    view.setInt16(
-      offset,
-      s < 0 ? s * 0x8000 : s * 0x7fff,
-      true
-    );
-  }
+  return Math.sqrt(sum / samples.length);
 }
 
 /**
- * Float32 mono sesi
- * standart 16-bit PCM WAV dosyasına dönüştürür.
+ * Canlı seviye göstergesi (LevelMeter) için 0-1 arasına ölçeklenmiş RMS.
+ * Sessizlik eşiği karşılaştırması için DEĞİL, sadece görsel gösterim için kullan.
  */
-export function encodeWAV(
-  samples: Float32Array,
-  sampleRate: number
-): Blob {
-  const bytesPerSample = 2;
-  const numChannels = 1;
-
-  const buffer = new ArrayBuffer(
-    44 + samples.length * bytesPerSample
-  );
-
-  const view = new DataView(buffer);
-
-  // RIFF
-  writeString(view, 0, "RIFF");
-  view.setUint32(
-    4,
-    36 + samples.length * bytesPerSample,
-    true
-  );
-  writeString(view, 8, "WAVE");
-
-  // fmt
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(
-    28,
-    sampleRate *
-      numChannels *
-      bytesPerSample,
-    true
-  );
-  view.setUint16(
-    32,
-    numChannels * bytesPerSample,
-    true
-  );
-  view.setUint16(34, 16, true);
-
-  // data
-  writeString(view, 36, "data");
-  view.setUint32(
-    40,
-    samples.length * bytesPerSample,
-    true
-  );
-
-  floatTo16BitPCM(view, 44, samples);
-
-  return new Blob([view], {
-    type: "audio/wav",
-  });
+export function calculateRMSLevel(samples: Float32Array): number {
+  return Math.min(1, calculateRMS(samples) * 4);
 }

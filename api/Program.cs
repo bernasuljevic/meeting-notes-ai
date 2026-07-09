@@ -6,6 +6,7 @@ using api.Services;
 using System.Collections.Generic;
 
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlServer(
@@ -16,69 +17,59 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Whisper servisi
 builder.Services.AddSingleton<TranscriptionService>();
 
-// Özetleme servisi (şimdilik placeholder, ileride Claude API ile değiştirilecek)
-builder.Services.AddSingleton<
-    ISummarizationService,
-    PlainTextSummarizationService>();
+// Özetleme servisi: Claude:ApiKey doluysa gerçek Claude API'yi, boşsa placeholder'ı kullan.
+var claudeApiKey = builder.Configuration["Claude:ApiKey"];
 
-builder.Services.AddCors(options =>
+if (!string.IsNullOrWhiteSpace(claudeApiKey))
 {
-    options.AddPolicy("AllowReact",
-        policy =>
-        {
-            policy
-                .AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader();
-        });
-});
+    builder.Services.AddHttpClient<ISummarizationService, ClaudeSummarizationService>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.anthropic.com/");
+        client.Timeout = TimeSpan.FromSeconds(300);
+    });
 
-// Add services to the container.
-builder.Services.AddOpenApi();
+    Console.WriteLine("Özetleme servisi: Claude API kullanılacak.");
+}
+else
+{
+    builder.Services.AddSingleton<ISummarizationService, PlainTextSummarizationService>();
 
-builder.Services.AddScoped<
-    IMeetingService,
-    MeetingService>();
-// app.UseHttpsRedirection();
+    Console.WriteLine("Özetleme servisi: PlainTextSummarizationService (yer tutucu) — Claude:ApiKey ayarlanmadı.");
+}
 
 builder.Services.Configure<ClaudeOptions>(
     builder.Configuration.GetSection(
         ClaudeOptions.SectionName
     ));
 
+builder.Services.AddScoped<IMeetingService, MeetingService>();
+
+// CORS: sadece Vite dev sunucusuna izin ver (AllowAnyOrigin prod'da risklidir)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReact",
+        policy =>
+        {
+            policy
+                .WithOrigins("http://localhost:5173")
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+});
+
+builder.Services.AddOpenApi();
+
 var app = builder.Build();
 
-
-// Whisper modelini uygulama açılışında yükle
+// Whisper modelini uygulama açılışında yükle (ilk istek beklemesin)
 app.Services.GetRequiredService<TranscriptionService>();
 
 app.UseCors("AllowReact");
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild",
-    "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast(
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-
-    return forecast;
-})
-.WithName("GetWeatherForecast");
 
 app.MapGet("/api/ping", () =>
 {
@@ -109,8 +100,17 @@ app.MapPost(
         });
     }
 
+    if (!int.TryParse(form["seq"], out var seq))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Geçerli bir 'seq' değeri bulunamadı"
+        });
+    }
+
     Console.WriteLine(
-        $"Ses geldi: {audio.FileName} - {audio.Length} byte"
+        $"Ses geldi: {audio.FileName} - {audio.Length} byte - seq={seq}"
     );
 
     await using var stream =
@@ -125,6 +125,7 @@ app.MapPost(
         return Results.Ok(new
         {
             success = true,
+            seq,
             fileName = audio.FileName,
             size = audio.Length,
             transcript
@@ -161,7 +162,9 @@ app.MapPost("/api/summarize", async (
         {
             GeneralSummary = summary.GeneralSummary,
             Decisions = summary.Decisions,
-            ActionItems = summary.ActionItems
+            ActionItems = summary.ActionItems,
+            OpenIssuesAndRisks = summary.OpenIssuesAndRisks,
+            KeyDiscussionPoints = summary.KeyDiscussionPoints
         });
     }
     catch (Exception ex)
@@ -246,15 +249,6 @@ app.MapDelete("/api/meetings/{id:guid}", async (
 
 app.Run();
 
-record WeatherForecast(
-    DateOnly Date,
-    int TemperatureC,
-    string? Summary)
-{
-    public int TemperatureF =>
-        32 + (int)(TemperatureC / 0.5556);
-}
-
 public record SummarizeRequest(string Transcript);
 
 public class SummarizeResponse
@@ -262,4 +256,6 @@ public class SummarizeResponse
     public string GeneralSummary { get; set; } = string.Empty;
     public List<string> Decisions { get; set; } = new();
     public List<string> ActionItems { get; set; } = new();
+    public List<string> OpenIssuesAndRisks { get; set; } = new();
+    public List<string> KeyDiscussionPoints { get; set; } = new();
 }
