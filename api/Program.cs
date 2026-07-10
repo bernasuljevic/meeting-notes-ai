@@ -17,30 +17,72 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Whisper servisi
 builder.Services.AddSingleton<TranscriptionService>();
 
-// Özetleme servisi: Claude:ApiKey doluysa gerçek Claude API'yi, boşsa placeholder'ı kullan.
-var claudeApiKey = builder.Configuration["Claude:ApiKey"];
-
-if (!string.IsNullOrWhiteSpace(claudeApiKey))
-{
-    builder.Services.AddHttpClient<ISummarizationService, ClaudeSummarizationService>(client =>
-    {
-        client.BaseAddress = new Uri("https://api.anthropic.com/");
-        client.Timeout = TimeSpan.FromSeconds(300);
-    });
-
-    Console.WriteLine("Özetleme servisi: Claude API kullanılacak.");
-}
-else
-{
-    builder.Services.AddSingleton<ISummarizationService, PlainTextSummarizationService>();
-
-    Console.WriteLine("Özetleme servisi: PlainTextSummarizationService (yer tutucu) — Claude:ApiKey ayarlanmadı.");
-}
-
 builder.Services.Configure<ClaudeOptions>(
     builder.Configuration.GetSection(
         ClaudeOptions.SectionName
     ));
+
+builder.Services.Configure<OllamaOptions>(
+    builder.Configuration.GetSection(
+        OllamaOptions.SectionName
+    ));
+
+// Özetleme servisi: "Summarization:Provider" ayarına göre seçilir.
+// - "claude"    -> Anthropic Claude API (bulut, Claude:ApiKey gerekli)
+// - "ollama"    -> Yerel LLM (Ollama), transkript kurum disina hic cikmaz; hassas
+//                  toplantilarda Claude yerine tercih edilebilir
+// - "plaintext" -> LLM kullanmadan duz metin ozet (yer tutucu)
+// - "auto" (varsayilan, ayar yoksa) -> Claude:ApiKey doluysa Claude, degilse PlainText
+var claudeApiKey = builder.Configuration["Claude:ApiKey"];
+var provider = (builder.Configuration["Summarization:Provider"] ?? "auto")
+    .Trim()
+    .ToLowerInvariant();
+
+if (provider == "auto")
+{
+    provider = string.IsNullOrWhiteSpace(claudeApiKey) ? "plaintext" : "claude";
+}
+
+switch (provider)
+{
+    case "ollama":
+        builder.Services.AddHttpClient<ISummarizationService, OllamaSummarizationService>(client =>
+        {
+            var baseUrl = builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434/";
+            client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+            client.Timeout = TimeSpan.FromSeconds(300);
+        });
+
+        Console.WriteLine("Özetleme servisi: Ollama (yerel LLM) kullanılacak.");
+        break;
+
+    case "claude":
+        if (string.IsNullOrWhiteSpace(claudeApiKey))
+        {
+            Console.WriteLine(
+                "Uyarı: Summarization:Provider 'claude' olarak ayarlı ama Claude:ApiKey boş — " +
+                "PlainTextSummarizationService'e düşülüyor.");
+
+            builder.Services.AddSingleton<ISummarizationService, PlainTextSummarizationService>();
+        }
+        else
+        {
+            builder.Services.AddHttpClient<ISummarizationService, ClaudeSummarizationService>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.anthropic.com/");
+                client.Timeout = TimeSpan.FromSeconds(300);
+            });
+
+            Console.WriteLine("Özetleme servisi: Claude API kullanılacak.");
+        }
+        break;
+
+    default:
+        builder.Services.AddSingleton<ISummarizationService, PlainTextSummarizationService>();
+
+        Console.WriteLine("Özetleme servisi: PlainTextSummarizationService (yer tutucu).");
+        break;
+}
 
 builder.Services.AddScoped<IMeetingService, MeetingService>();
 
