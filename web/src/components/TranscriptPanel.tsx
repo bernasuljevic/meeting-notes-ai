@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TranscriptPanelProps {
   transcript: string | null;
@@ -72,7 +73,11 @@ export function TranscriptPanel({
               {transcript}
             </p>
           ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Transkript oluşturuluyor...</p>
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
           )}
         </ScrollArea>
       </CardContent>

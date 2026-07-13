@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Recorder } from "./components/Recorder";
 import { MeetingHistory } from "./components/MeetingHistory";
 import { MeetingDetail } from "./components/MeetingDetail";
+import { MeetingDetailSkeleton } from "./components/MeetingDetailSkeleton";
 import { ModeToggle } from "./components/mode-toggle";
 import {
   getMeeting,
@@ -66,6 +68,25 @@ function App() {
     loadMeeting();
   }, [selectedMeetingId]);
 
+  // İnternet bağlantısı kesilir/geri gelirse kullanıcıyı toast ile bilgilendir.
+  useEffect(() => {
+    function handleOffline() {
+      toast.warning("İnternet bağlantısı yok.");
+    }
+
+    function handleOnline() {
+      toast.success("İnternet bağlantısı geri geldi.");
+    }
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
   function handleMeetingSaved() {
     setRefreshKey((prev) => prev + 1);
   }
@@ -79,7 +100,7 @@ function App() {
 
       {/* HEADER */}
 
-      <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
 
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5">
 
@@ -111,11 +132,11 @@ function App() {
 
       {/* CONTENT */}
 
-      <main className="mx-auto grid max-w-7xl grid-cols-12 gap-6 p-6">
+      <main className="mx-auto grid max-w-7xl grid-cols-12 gap-6 p-6 print:block print:p-0">
 
         {/* SOL TARAF */}
 
-        <aside className="col-span-12 lg:col-span-4 xl:col-span-3">
+        <aside className="col-span-12 lg:col-span-4 xl:col-span-3 print:hidden">
 
           <MeetingHistory
             refreshKey={refreshKey}
@@ -127,28 +148,24 @@ function App() {
                 current === deletedId ? null : current
               );
             }}
+            onStartRecording={handleNewMeeting}
           />
 
         </aside>
 
         {/* SAĞ TARAF */}
 
-        <section className="col-span-12 lg:col-span-8 xl:col-span-9">
+        <section className="col-span-12 lg:col-span-8 xl:col-span-9 print:col-span-12">
 
           {loadingMeeting ? (
 
-            <div className="rounded-2xl bg-white p-8 shadow dark:bg-slate-900">
-
-              <p className="text-slate-500 dark:text-slate-400">
-                Toplantı yükleniyor...
-              </p>
-
-            </div>
+            <MeetingDetailSkeleton />
 
           ) : selectedMeeting ? (
 
             <MeetingDetail
               meeting={selectedMeeting}
+              onBack={handleNewMeeting}
             />
 
           ) : (
@@ -169,7 +186,7 @@ function App() {
 
         <button
           onClick={handleNewMeeting}
-          className="fixed bottom-6 right-6 rounded-full bg-blue-600 px-5 py-3 text-white shadow-lg transition hover:bg-blue-700"
+          className="fixed bottom-6 right-6 rounded-full bg-blue-600 px-5 py-3 text-white shadow-lg transition hover:bg-blue-700 print:hidden"
         >
           + Yeni Toplantı
         </button>

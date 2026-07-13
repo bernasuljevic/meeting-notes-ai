@@ -4,6 +4,7 @@ import {
   CalendarClock,
   FolderOpen,
   Loader2,
+  Mic,
   Search,
   Timer,
   Trash2,
@@ -15,6 +16,7 @@ import {
   getMeetings,
   type MeetingListItem,
 } from "../lib/api";
+import { formatDuration } from "../lib/meetingStats";
 
 import {
   AlertDialog,
@@ -35,19 +37,50 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MeetingHistorySkeleton } from "./MeetingHistorySkeleton";
 
 interface MeetingHistoryProps {
   refreshKey: number;
   selectedMeetingId: string | null;
   onMeetingSelect: (id: string) => void;
   onMeetingDeleted: (id: string) => void;
+  onStartRecording?: () => void;
 }
 
 type SortMode = "newest" | "oldest" | "title";
+type DateFilter = "today" | "week" | "month" | "all";
 
 interface MeetingGroup {
   label: string | null;
   items: MeetingListItem[];
+}
+
+const DATE_FILTERS: Array<{ value: DateFilter; label: string }> = [
+  { value: "today", label: "Bugün" },
+  { value: "week", label: "Bu Hafta" },
+  { value: "month", label: "Bu Ay" },
+  { value: "all", label: "Tümü" },
+];
+
+function matchesDateFilter(iso: string, filter: DateFilter): boolean {
+  if (filter === "all") return true;
+
+  const date = new Date(iso);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (filter === "today") {
+    return date >= startOfToday;
+  }
+
+  if (filter === "week") {
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - 6);
+    return date >= startOfWeek;
+  }
+
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  return date >= startOfMonth;
 }
 
 // Sadece görünüm amaçlı yardımcılar: veri modeli/API değişmiyor,
@@ -65,20 +98,6 @@ function formatMeetingDateTime(iso: string): string {
   });
 
   return `${datePart}, ${timePart}`;
-}
-
-function formatDuration(startedAt: string, endedAt: string | null): string | null {
-  if (!endedAt) return null;
-
-  const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
-
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-
-  const totalMinutes = Math.round(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return hours > 0 ? `${hours} sa ${minutes} dk` : `${minutes} dk`;
 }
 
 function sortMeetings(items: MeetingListItem[], mode: SortMode): MeetingListItem[] {
@@ -167,6 +186,7 @@ export function MeetingHistory({
   selectedMeetingId,
   onMeetingSelect,
   onMeetingDeleted,
+  onStartRecording,
 }: MeetingHistoryProps) {
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +195,7 @@ export function MeetingHistory({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
 
   useEffect(() => {
     async function loadMeetings() {
@@ -223,8 +244,10 @@ export function MeetingHistory({
     }
   }
 
-  const filteredMeetings = meetings.filter((meeting) =>
-    meeting.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  const filteredMeetings = meetings.filter(
+    (meeting) =>
+      meeting.title.toLowerCase().includes(searchQuery.trim().toLowerCase()) &&
+      matchesDateFilter(meeting.startedAt, dateFilter)
   );
 
   const sortedMeetings = sortMeetings(filteredMeetings, sortMode);
@@ -267,26 +290,50 @@ export function MeetingHistory({
           <option value="oldest">En eski</option>
           <option value="title">İsme göre (A-Z)</option>
         </select>
+
+        <div className="flex gap-1">
+          {DATE_FILTERS.map((filter) => (
+            <Button
+              key={filter.value}
+              type="button"
+              size="xs"
+              variant={dateFilter === filter.value ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setDateFilter(filter.value)}
+            >
+              {filter.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      {loading && (
-        <CardContent className="flex items-center justify-center gap-3 py-10 text-slate-500 dark:text-slate-400">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Toplantılar yükleniyor...
-        </CardContent>
-      )}
+      {loading && <MeetingHistorySkeleton />}
 
       {error && <CardContent className="text-red-600 dark:text-red-400">{error}</CardContent>}
 
       {!loading && !error && meetings.length === 0 && (
-        <CardContent className="py-10 text-center text-slate-500 dark:text-slate-400">
-          Henüz kayıtlı toplantı bulunmuyor.
+        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-500/15">
+            <Mic className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+              Henüz toplantı yok
+            </h3>
+            <p className="mt-1 max-w-[220px] text-sm text-slate-500 dark:text-slate-400">
+              İlk toplantını kaydettiğinde burada görünecek.
+            </p>
+          </div>
+          <Button type="button" size="sm" className="mt-1 gap-1.5" onClick={onStartRecording}>
+            <Mic className="h-3.5 w-3.5" />
+            Kayıt Başlat
+          </Button>
         </CardContent>
       )}
 
       {!loading && !error && meetings.length > 0 && filteredMeetings.length === 0 && (
         <CardContent className="py-10 text-center text-slate-500 dark:text-slate-400">
-          Arama sonucu bulunamadı.
+          Bu arama/filtreyle eşleşen toplantı yok.
         </CardContent>
       )}
 

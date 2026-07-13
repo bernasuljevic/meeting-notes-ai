@@ -1,4 +1,5 @@
 // web/src/components/Recorder.tsx
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Circle,
@@ -20,7 +21,6 @@ import { Separator } from "@/components/ui/separator";
 
 import { LevelMeter } from "./LevelMeter";
 import { NotesPanel } from "./NotesPanel";
-import { SaveMeetingPanel } from "./SaveMeetingPanel";
 import { TranscriptPanel } from "./TranscriptPanel";
 
 interface RecorderProps {
@@ -33,6 +33,20 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes.toString().padStart(2, "0")}:${seconds
     .toString()
     .padStart(2, "0")}`;
+}
+
+// Backend'de AI başlık üretimi hazır olana kadar (bkz. proje yol haritası),
+// toplantıya geçici olarak tarih/saate dayalı bir başlık veriliyor. Kullanıcının
+// artık bir başlık yazıp "Kaydet"e basmasına gerek yok; kayıt bitip özet
+// oluşunca toplantı otomatik kaydediliyor.
+function generatePlaceholderTitle(date: Date): string {
+  const formatted = date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `Toplantı - ${formatted}`;
 }
 
 export function Recorder({ onMeetingSaved }: RecorderProps) {
@@ -48,33 +62,73 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
     stopRecording,
   } = useRecorder();
 
-  const hasTranscript = transcript.length > 0;
+  const [isSaving, setIsSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
-  async function handleSaveMeeting(title: string) {
-    if (!transcript || !notes) {
+  const recordingStartedAtRef = useRef<string | null>(null);
+  const recordingEndedAtRef = useRef<string | null>(null);
+  const hasAutoSavedRef = useRef(false);
+
+  const hasTranscript = transcript.length > 0 && !justSaved;
+  const hasNotes = notes !== null && !justSaved;
+
+  async function handleStartRecording() {
+    recordingStartedAtRef.current = new Date().toISOString();
+    recordingEndedAtRef.current = null;
+    hasAutoSavedRef.current = false;
+    setJustSaved(false);
+    await startRecording();
+  }
+
+  function handleStopRecording() {
+    recordingEndedAtRef.current = new Date().toISOString();
+    stopRecording();
+  }
+
+  // Transkript + AI özeti hazır olur olmaz toplantıyı otomatik kaydet.
+  // Kullanıcının artık "Kaydet" butonuna basmasına gerek yok.
+  useEffect(() => {
+    if (!notes || !transcript || isFinalizing || hasAutoSavedRef.current) {
       return;
     }
 
-    try {
-      const result = await createMeeting({
-        title,
-        startedAt: new Date().toISOString(),
-        endedAt: new Date().toISOString(),
-        transcript,
-        summary: notes,
-      });
+    hasAutoSavedRef.current = true;
 
-      console.log("Toplantı kaydedildi:", result.id);
+    async function autoSave() {
+      const startedAt = recordingStartedAtRef.current ?? new Date().toISOString();
+      const endedAt = recordingEndedAtRef.current ?? new Date().toISOString();
+      const title = generatePlaceholderTitle(new Date(startedAt));
 
-      onMeetingSaved?.();
+      try {
+        setIsSaving(true);
 
-      toast.success("Toplantı başarıyla kaydedildi.");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Toplantı kaydedilemedi."
-      );
+        await createMeeting({
+          title,
+          startedAt,
+          endedAt,
+          transcript,
+          summary: notes!,
+        });
+
+        toast.success("Toplantı kaydedildi.");
+        onMeetingSaved?.();
+        setJustSaved(true);
+      } catch (err) {
+        // Kaydetme başarısız olursa otomatik tekrar denemiyoruz (ör. transkript
+        // tekrar değişmediği sürece); kullanıcı hatayı görüp gerekirse tekrar
+        // kayıt alabilir. hasAutoSavedRef true kaldığı için aynı sonuçla
+        // tekrar tekrar denenmez.
+        toast.error(
+          err instanceof Error ? err.message : "Toplantı kaydedilemedi."
+        );
+      } finally {
+        setIsSaving(false);
+      }
     }
-  }
+
+    autoSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes, transcript, isFinalizing]);
 
   return (
     <div className="space-y-8">
@@ -98,7 +152,8 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
 
               <p className="mt-3 max-w-md text-sm leading-relaxed text-blue-50/90">
                 Kaydı başlatın, transkript canlı olarak oluşsun; kaydı
-                bitirdiğinizde yapay zekâ otomatik olarak özetlesin.
+                bitirdiğinizde yapay zekâ özetlesin ve toplantı otomatik
+                olarak kaydedilsin.
               </p>
             </div>
 
@@ -125,15 +180,12 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
             <p>
               Bu toplantı kaydedilmektedir. Katılımcıları bilgilendirin ve
               gerekiyorsa (özellikle müşteri toplantılarında) rızalarını alın.
-              Ses, transkript oluşturmak için kendi cihazınızda işlenir; yapay
-              zekâ özeti aktif olduğunda transkript metni, özet oluşturmak
-              amacıyla Claude API'ye (Anthropic) gönderilir.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
             <Button
-              onClick={startRecording}
+              onClick={handleStartRecording}
               disabled={isRecording}
               size="lg"
               className="gap-2"
@@ -143,7 +195,7 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
             </Button>
 
             <Button
-              onClick={stopRecording}
+              onClick={handleStopRecording}
               disabled={!isRecording}
               variant="destructive"
               size="lg"
@@ -174,6 +226,20 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
             </div>
           )}
 
+          {isSaving && (
+            <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              <p>Toplantı kaydediliyor...</p>
+            </div>
+          )}
+
+          {justSaved && !isSaving && (
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <Mic className="h-4 w-4 shrink-0" />
+              <p>Toplantı kaydedildi. Yeni bir kayıt başlatabilirsin.</p>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -191,13 +257,13 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
       />
 
       {/* Notlar / Özet (otomatik oluşur) */}
-      <NotesPanel
-        summary={notes}
-        isSummarizing={isFinalizing}
-        error={error}
-      />
-
-      {notes && <SaveMeetingPanel onSave={handleSaveMeeting} />}
+      {!justSaved && (
+        <NotesPanel
+          summary={hasNotes ? notes : null}
+          isSummarizing={isFinalizing}
+          error={error}
+        />
+      )}
     </div>
   );
 }
