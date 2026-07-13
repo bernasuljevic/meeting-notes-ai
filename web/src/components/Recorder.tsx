@@ -7,12 +7,14 @@ import {
   Info,
   Loader2,
   Mic,
+  Save,
+  Sparkles,
   Square,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useRecorder } from "../hooks/useRecorder";
-import { createMeeting } from "../lib/api";
+import { createMeeting, finalizeMeeting, startMeeting } from "../lib/api";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,10 +37,11 @@ function formatDuration(totalSeconds: number): string {
     .padStart(2, "0")}`;
 }
 
-// Backend'de AI başlık üretimi hazır olana kadar (bkz. proje yol haritası),
-// toplantıya geçici olarak tarih/saate dayalı bir başlık veriliyor. Kullanıcının
-// artık bir başlık yazıp "Kaydet"e basmasına gerek yok; kayıt bitip özet
-// oluşunca toplantı otomatik kaydediliyor.
+// Backend'de gerçek AI başlık üretimi hazır olana kadar, tarih/saate dayalı bir
+// başlık ÖNERİSİ üretilir. Kullanıcı kayıt bitip özet hazır olduğunda bu öneriyi
+// görür, isterse değiştirir ve "Kaydet"e basarak onaylar — toplantı kendiliğinden,
+// kullanıcıya sormadan kaydedilmez (sadece transkript/parçalar kayıt sırasında
+// zaten canlı olarak DB'ye yazılmıştı, bkz. useRecorder + /api/meetings/start).
 function generatePlaceholderTitle(date: Date): string {
   const formatted = date.toLocaleString("tr-TR", {
     day: "2-digit",
@@ -64,20 +67,46 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [readyToName, setReadyToName] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
 
   const recordingStartedAtRef = useRef<string | null>(null);
   const recordingEndedAtRef = useRef<string | null>(null);
-  const hasAutoSavedRef = useRef(false);
+  const hasPromptedForTitleRef = useRef(false);
+  // startMeeting başarılı olursa dolar; kayıt boyunca her parça bu toplantıya
+  // canlı olarak kaydedilir (bkz. useRecorder). Başarısız olursa undefined kalır
+  // ve kayıt yine de devam eder — sadece "canlı kayıt güvenliği" devre dışı olur,
+  // eski (kayıt bitince tek seferde kaydeden) akışa düşülür.
+  const meetingIdRef = useRef<string | undefined>(undefined);
 
   const hasTranscript = transcript.length > 0 && !justSaved;
   const hasNotes = notes !== null && !justSaved;
 
   async function handleStartRecording() {
-    recordingStartedAtRef.current = new Date().toISOString();
+    const startedAt = new Date().toISOString();
+    recordingStartedAtRef.current = startedAt;
     recordingEndedAtRef.current = null;
-    hasAutoSavedRef.current = false;
+    hasPromptedForTitleRef.current = false;
     setJustSaved(false);
-    await startRecording();
+    setReadyToName(false);
+    setTitleDraft("");
+
+    try {
+      const title = generatePlaceholderTitle(new Date(startedAt));
+      const { id } = await startMeeting({ title, startedAt });
+      meetingIdRef.current = id;
+    } catch (err) {
+      meetingIdRef.current = undefined;
+      console.error(
+        "[Recorder] Toplantı başlatılamadı, canlı kayıt güvenliği devre dışı:",
+        err
+      );
+      toast.warning(
+        "Canlı kayıt güvenliği başlatılamadı (sunucuya ulaşılamadı). Kayıt yine de devam edebilir, ama kayıt bitmeden yarıda kesilirse kurtarılamaz."
+      );
+    }
+
+    await startRecording(meetingIdRef.current);
   }
 
   function handleStopRecording() {
@@ -85,50 +114,67 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
     stopRecording();
   }
 
-  // Transkript + AI özeti hazır olur olmaz toplantıyı otomatik kaydet.
-  // Kullanıcının artık "Kaydet" butonuna basmasına gerek yok.
+  // Transkript + AI özeti hazır olur olmaz, toplantıyı doğrudan kendiliğinden
+  // kaydetmek yerine bir başlık ÖNERİSİ hazırlayıp kullanıcıdan onay bekle.
+  // (Veri kaybı riski yok: parçalar kayıt sırasında zaten canlı olarak DB'ye
+  // yazılmıştı — burada eksik olan sadece gerçek başlık/bitiş/özetin onayı.)
   useEffect(() => {
-    if (!notes || !transcript || isFinalizing || hasAutoSavedRef.current) {
+    if (!notes || !transcript || isFinalizing || hasPromptedForTitleRef.current) {
       return;
     }
 
-    hasAutoSavedRef.current = true;
+    hasPromptedForTitleRef.current = true;
 
-    async function autoSave() {
-      const startedAt = recordingStartedAtRef.current ?? new Date().toISOString();
-      const endedAt = recordingEndedAtRef.current ?? new Date().toISOString();
-      const title = generatePlaceholderTitle(new Date(startedAt));
+    const startedAt = recordingStartedAtRef.current ?? new Date().toISOString();
+    setTitleDraft(generatePlaceholderTitle(new Date(startedAt)));
+    setReadyToName(true);
+  }, [notes, transcript, isFinalizing]);
 
-      try {
-        setIsSaving(true);
+  async function handleConfirmSave(e: React.FormEvent) {
+    e.preventDefault();
 
+    if (!notes) return;
+
+    const startedAt = recordingStartedAtRef.current ?? new Date().toISOString();
+    const endedAt = recordingEndedAtRef.current ?? new Date().toISOString();
+    const title =
+      titleDraft.trim() || generatePlaceholderTitle(new Date(startedAt));
+
+    try {
+      setIsSaving(true);
+
+      if (meetingIdRef.current) {
+        // Toplantı kayıt başlarken zaten oluşturulmuştu (canlı kayıt); şimdi
+        // kullanıcının onayladığı başlık, bitiş zamanı ve AI özetiyle tamamlanıyor.
+        await finalizeMeeting(meetingIdRef.current, {
+          title,
+          endedAt,
+          summary: notes,
+        });
+      } else {
+        // startMeeting kayıt başlarken başarısız olmuştu; eski tek seferlik
+        // kaydetme akışına düş (canlı kayıt güvenliği olmadan, ama yine de kaydeder).
         await createMeeting({
           title,
           startedAt,
           endedAt,
           transcript,
-          summary: notes!,
+          summary: notes,
         });
-
-        toast.success("Toplantı kaydedildi.");
-        onMeetingSaved?.();
-        setJustSaved(true);
-      } catch (err) {
-        // Kaydetme başarısız olursa otomatik tekrar denemiyoruz (ör. transkript
-        // tekrar değişmediği sürece); kullanıcı hatayı görüp gerekirse tekrar
-        // kayıt alabilir. hasAutoSavedRef true kaldığı için aynı sonuçla
-        // tekrar tekrar denenmez.
-        toast.error(
-          err instanceof Error ? err.message : "Toplantı kaydedilemedi."
-        );
-      } finally {
-        setIsSaving(false);
       }
-    }
 
-    autoSave();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes, transcript, isFinalizing]);
+      toast.success("Toplantı kaydedildi.");
+      onMeetingSaved?.();
+      setReadyToName(false);
+      setJustSaved(true);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Toplantı kaydedilemedi."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -152,8 +198,8 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
 
               <p className="mt-3 max-w-md text-sm leading-relaxed text-blue-50/90">
                 Kaydı başlatın, transkript canlı olarak oluşsun; kaydı
-                bitirdiğinizde yapay zekâ özetlesin ve toplantı otomatik
-                olarak kaydedilsin.
+                bitirdiğinizde yapay zekâ özetlesin, sonra önerilen ismi
+                değiştirip kaydedin.
               </p>
             </div>
 
@@ -226,11 +272,38 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
             </div>
           )}
 
-          {isSaving && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              <p>Toplantı kaydediliyor...</p>
-            </div>
+          {readyToName && !justSaved && (
+            <form
+              onSubmit={handleConfirmSave}
+              className="space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+                <Sparkles className="h-4 w-4" />
+                Toplantıya bir isim ver (öneriyi değiştirebilirsin)
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  disabled={isSaving}
+                  placeholder="Toplantı adı"
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <Button
+                  type="submit"
+                  disabled={isSaving || !titleDraft.trim()}
+                  className="gap-2"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Kaydet
+                </Button>
+              </div>
+            </form>
           )}
 
           {justSaved && !isSaving && (

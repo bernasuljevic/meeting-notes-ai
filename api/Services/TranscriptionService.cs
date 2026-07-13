@@ -4,6 +4,12 @@ namespace api.Services;
 
 public class TranscriptionService : IDisposable
 {
+    // Bir sonraki parçaya "bağlam" olarak geçilecek metnin üst sınırı. Whisper'ın
+    // initial prompt'u zaten kendi içinde son token'larla sınırlanıyor
+    // (WithMaxLastTextTokens); buradaki sınır sadece istemciden makul olmayan
+    // uzunlukta bir metin gelirse savunma amaçlı.
+    private const int MaxContextChars = 200;
+
     private readonly WhisperFactory _factory;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly string _language;
@@ -22,17 +28,33 @@ public class TranscriptionService : IDisposable
         Console.WriteLine("Whisper modeli yüklendi.");
     }
 
-    public async Task<string> TranscribeAsync(Stream audioStream)
+    /// <summary>
+    /// Bir ses parçasını Türkçe transkript eder. <paramref name="previousContext"/>
+    /// verilirse (bir önceki parçanın transkript edilmiş metni), Whisper'a "initial
+    /// prompt" olarak geçilir — parçalar birbirinden tamamen bağımsız işlendiği için,
+    /// cümlenin bir parçanın sonunda kesilip diğerinin başında devam ettiği durumlarda
+    /// doğruluğu artırmak amacıyla.
+    /// </summary>
+    public async Task<string> TranscribeAsync(Stream audioStream, string? previousContext = null)
     {
         // whisper.cpp context'i eşzamanlı çalışamaz — istekleri sıraya sok.
         await _semaphore.WaitAsync();
 
         try
         {
-            using var processor =
-                _factory.CreateBuilder()
-                    .WithLanguage(_language)
-                    .Build();
+            var builder = _factory.CreateBuilder()
+                .WithLanguage(_language);
+
+            if (!string.IsNullOrWhiteSpace(previousContext))
+            {
+                var trimmedContext = previousContext.Length > MaxContextChars
+                    ? previousContext[^MaxContextChars..]
+                    : previousContext;
+
+                builder = builder.WithPrompt(trimmedContext);
+            }
+
+            using var processor = builder.Build();
 
             var result = new System.Text.StringBuilder();
 

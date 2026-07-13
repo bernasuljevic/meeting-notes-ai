@@ -12,6 +12,46 @@ const MAX_CHUNK_SEC = 22; // sessizlik olmasa bile bu süreyi geçince zorunlu g
 const MIN_CHUNK_SEC = 1; // bundan kısa parçayı hiç gönderme
 const SILENCE_RMS = 0.012; // bu eşiğin altı "sessizlik" sayılır
 
+// Backpressure: ağ/sunucu yavaşsa istekler sınırsız birikmesin diye aynı anda en
+// fazla bu kadar transkripsiyon isteği havada olsun; kalanlar kuyrukta bekler.
+const MAX_CONCURRENT_TRANSCRIBE_REQUESTS = 2;
+
+// Kayıp parça toleransı: bir parça başarısız olursa, üstel geri çekilmeyle
+// (1sn, 2sn, 4sn) bu kadar kez daha denenir.
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 1000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * `transcribeAudio`'yu, geçici ağ/sunucu hatalarına karşı üstel geri çekilmeyle
+ * tekrar dener. Tüm denemeler başarısız olursa son hatayı fırlatır.
+ */
+async function transcribeChunkWithRetry(
+  blob: Blob,
+  seq: number,
+  previousContext: string | undefined,
+  meetingId: string | undefined
+): Promise<{ seq: number; transcript: string }> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await transcribeAudio(blob, seq, previousContext, meetingId);
+    } catch (err) {
+      lastError = err;
+
+      if (attempt < MAX_RETRY_ATTEMPTS) {
+        await sleep(RETRY_BASE_DELAY_MS * 2 ** attempt);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 interface UseRecorderReturn {
   isRecording: boolean;
   isFinalizing: boolean; // "Bitir"den sonra bekleyen istekler + not oluşturma sürüyor
@@ -21,7 +61,10 @@ interface UseRecorderReturn {
   notes: SummarizeResponse | null;
   audioBlob: Blob | null; // tüm kaydın birleşik WAV hali (yerel oynatma/indirme için)
   error: string | null;
-  startRecording: () => Promise<void>;
+  // meetingId (opsiyonel): startMeeting ile önceden oluşturulmuş bir toplantının
+  // kimliği. Verilirse, her ses parçası transkript edilir edilmez o toplantıya
+  // kalıcı olarak da yazılır (canlı kayıt sırasında veri kaybı olmasın diye).
+  startRecording: (meetingId?: string) => Promise<void>;
   stopRecording: () => void;
 }
 
@@ -49,6 +92,14 @@ export function useRecorder(): UseRecorderReturn {
   const transcriptPartsRef = useRef<Map<number, string>>(new Map());
   const pendingRequestsRef = useRef<Promise<void>[]>([]);
 
+  // Backpressure kuyruğu: flushPendingChunk parçayı doğrudan göndermek yerine
+  // buraya ekler; pumpQueue, aynı anda en fazla MAX_CONCURRENT_TRANSCRIBE_REQUESTS
+  // istek olacak şekilde kuyruktan sırayla gönderir.
+  const chunkQueueRef = useRef<Array<{ seq: number; blob: Blob }>>([]);
+  const inFlightCountRef = useRef(0);
+  const failedSeqsRef = useRef<Set<number>>(new Set());
+  const meetingIdRef = useRef<string | undefined>(undefined);
+
   const updateTranscriptState = useCallback(() => {
     const sortedSeqs = Array.from(transcriptPartsRef.current.keys()).sort((a, b) => a - b);
     const combined = sortedSeqs
@@ -57,6 +108,46 @@ export function useRecorder(): UseRecorderReturn {
       .trim();
     setTranscript(combined);
   }, []);
+
+  const pumpQueue = useCallback(() => {
+    while (
+      inFlightCountRef.current < MAX_CONCURRENT_TRANSCRIBE_REQUESTS &&
+      chunkQueueRef.current.length > 0
+    ) {
+      const item = chunkQueueRef.current.shift();
+      if (!item) break;
+
+      inFlightCountRef.current += 1;
+
+      // En iyi çaba bağlam taşıma: bir önceki parça (seq - 1) zaten çözülmüşse
+      // Whisper'a bağlam olarak geçilir. Henüz çözülmediyse (backpressure
+      // sayesinde genelde çözülmüş olur, ama garanti değil) bağlamsız gönderilir
+      // — parçanın kendisini bloklamaya değmez.
+      const previousContext = transcriptPartsRef.current.get(item.seq - 1);
+
+      const request = transcribeChunkWithRetry(item.blob, item.seq, previousContext, meetingIdRef.current)
+        .then((result) => {
+          transcriptPartsRef.current.set(item.seq, result.transcript);
+          updateTranscriptState();
+        })
+        .catch((err) => {
+          failedSeqsRef.current.add(item.seq);
+          console.error(
+            `[useRecorder] Parça #${item.seq}, ${MAX_RETRY_ATTEMPTS} tekrar denemeden sonra transkript edilemedi:`,
+            err
+          );
+          setError(
+            "Bazı ses parçaları işlenemedi, transkript eksik olabilir. İnternet/sunucu bağlantısını kontrol et."
+          );
+        })
+        .finally(() => {
+          inFlightCountRef.current -= 1;
+          pumpQueue();
+        });
+
+      pendingRequestsRef.current.push(request);
+    }
+  }, [updateTranscriptState]);
 
   const flushPendingChunk = useCallback(() => {
     if (pendingSampleCountRef.current === 0) return;
@@ -76,20 +167,12 @@ export function useRecorder(): UseRecorderReturn {
     const wavBlob = encodeWAV(merged, TARGET_SAMPLE_RATE);
     const seq = nextSeqRef.current++;
 
-    // Fire-and-forget: beklemeden gönder, dönen sonucu seq'e göre yerleştir
-    const request = transcribeAudio(wavBlob, seq)
-      .then((result) => {
-        transcriptPartsRef.current.set(seq, result.transcript);
-        updateTranscriptState();
-      })
-      .catch((err) => {
-        console.error(`[useRecorder] Parça #${seq} transkript edilemedi:`, err);
-      });
+    // Doğrudan göndermek yerine kuyruğa ekle; pumpQueue backpressure'ı uygular.
+    chunkQueueRef.current.push({ seq, blob: wavBlob });
+    pumpQueue();
+  }, [pumpQueue]);
 
-    pendingRequestsRef.current.push(request);
-  }, [updateTranscriptState]);
-
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (meetingId?: string) => {
     setError(null);
     setAudioBlob(null);
     setTranscript("");
@@ -102,6 +185,10 @@ export function useRecorder(): UseRecorderReturn {
     nextSeqRef.current = 0;
     transcriptPartsRef.current = new Map();
     pendingRequestsRef.current = [];
+    chunkQueueRef.current = [];
+    inFlightCountRef.current = 0;
+    failedSeqsRef.current = new Set();
+    meetingIdRef.current = meetingId;
 
     try {
       // 1. Mikrofon izni iste ve stream al (echo/gürültü/otomatik kazanç kapalı bırakılmaz)
@@ -221,6 +308,12 @@ export function useRecorder(): UseRecorderReturn {
           .trim();
 
         setTranscript(finalTranscript);
+
+        if (failedSeqsRef.current.size > 0) {
+          setError(
+            `${failedSeqsRef.current.size} ses parçası tekrar denemelere rağmen işlenemedi; transkript eksik olabilir.`
+          );
+        }
 
         if (finalTranscript.length > 0) {
           const summary = await summarizeTranscript(finalTranscript);

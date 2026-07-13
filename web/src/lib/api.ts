@@ -9,12 +9,29 @@ export interface TranscribeResponse {
 
 /**
  * Kaydedilen ses parçasını (chunk) backend'e gönderir ve Whisper transkripsiyonunu döner.
- * `seq`, parçaların doğru sırayla birleştirilebilmesi için zorunlu.
+ * `seq`, parçaların doğru sırayla birleştirilebilmesi için zorunlu. `previousContext`
+ * (opsiyonel) bir önceki parçanın transkript metnidir; Whisper'a bağlam olarak geçilip
+ * cümle ortası kesilen parçalarda doğruluğu artırır. `meetingId` (opsiyonel) verilirse,
+ * backend transkripti aynı anda o toplantıya kalıcı olarak da yazar (canlı kayıt sırasında
+ * veri kaybı olmaması için) — bkz. startMeeting.
  */
-export async function transcribeAudio(audioBlob: Blob, seq: number): Promise<TranscribeResponse> {
+export async function transcribeAudio(
+  audioBlob: Blob,
+  seq: number,
+  previousContext?: string,
+  meetingId?: string
+): Promise<TranscribeResponse> {
   const formData = new FormData();
   formData.append("audio", audioBlob, "recording.wav");
   formData.append("seq", String(seq));
+
+  if (previousContext) {
+    formData.append("previousContext", previousContext);
+  }
+
+  if (meetingId) {
+    formData.append("meetingId", meetingId);
+  }
 
   const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
     method: "POST",
@@ -212,4 +229,59 @@ export async function createMeeting(request: CreateMeetingRequest): Promise<Crea
   }
 
   return await response.json();
+}
+
+export interface StartMeetingRequest {
+  title: string;
+  startedAt: string;
+}
+
+export interface StartMeetingResponse {
+  id: string;
+}
+
+/**
+ * Kayıt başlar başlamaz çağrılır: sunucuda hemen (EndedAt = null) bir toplantı satırı
+ * oluşturur. Dönen id, her /api/transcribe çağrısıyla birlikte gönderilip parçaların
+ * canlı olarak bu toplantıya kaydedilmesini sağlar — tarayıcı kayıt bitmeden
+ * çökerse/kapanırsa bile o ana kadarki transkript kaybolmaz.
+ */
+export async function startMeeting(request: StartMeetingRequest): Promise<StartMeetingResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings/start`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error("Toplantı başlatılamadı.");
+  }
+
+  return await response.json();
+}
+
+export interface FinalizeMeetingRequest {
+  title: string;
+  endedAt: string;
+  summary: SummarizeResponse;
+}
+
+/**
+ * Kayıt bitip yapay zekâ özeti hazır olunca çağrılır: startMeeting'te oluşturulan
+ * toplantıyı gerçek başlık, bitiş zamanı ve özetle tamamlar.
+ */
+export async function finalizeMeeting(id: string, request: FinalizeMeetingRequest): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}/finalize`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error("Toplantı tamamlanamadı.");
+  }
 }

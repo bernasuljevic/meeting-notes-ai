@@ -146,7 +146,8 @@ app.MapPost(
     "/api/transcribe",
     async (
         HttpRequest request,
-        TranscriptionService transcriptionService
+        TranscriptionService transcriptionService,
+        IMeetingService meetingService
     ) =>
 {
     var form = await request.ReadFormAsync();
@@ -171,6 +172,22 @@ app.MapPost(
         });
     }
 
+    // Opsiyonel: bir önceki parçanın transkript metni. İstemci, aynı kaydın bir
+    // önceki parçası zaten çözülmüşse bunu gönderir; Whisper'a "initial prompt"
+    // olarak geçilip cümle ortası kesilen parçalarda doğruluğu artırır. Eski
+    // istemciler bu alanı hiç göndermeyebilir — geriye dönük uyumlu, opsiyonel.
+    var previousContext = form["previousContext"].ToString();
+
+    // Opsiyonel: bu parçanın ait olduğu toplantının kimliği (bkz. POST
+    // /api/meetings/start). Verilirse, transkript edilir edilmez o toplantıya
+    // kalıcı olarak da yazılır — kayıt bitmeden tarayıcı çökerse/kapanırsa bile
+    // o ana kadarki transkript kaybolmasın diye. Eski istemciler veya toplantı
+    // başlatma isteği başarısız olduysa bu alan boş gelebilir; geriye dönük
+    // uyumlu, opsiyonel.
+    Guid? meetingId = Guid.TryParse(form["meetingId"], out var parsedMeetingId)
+        ? parsedMeetingId
+        : null;
+
     Console.WriteLine(
         $"Ses geldi: {audio.FileName} - {audio.Length} byte - seq={seq}"
     );
@@ -182,7 +199,20 @@ app.MapPost(
     {
         var transcript =
             await transcriptionService
-                .TranscribeAsync(stream);
+                .TranscribeAsync(stream, previousContext);
+
+        if (meetingId.HasValue)
+        {
+            var appended = await meetingService.AppendTranscriptSegmentAsync(
+                meetingId.Value, seq, transcript);
+
+            if (!appended)
+            {
+                Console.WriteLine(
+                    $"Uyarı: meetingId={meetingId} bulunamadı, parça #{seq} DB'ye yazılamadı (sadece istemciye döndü)."
+                );
+            }
+        }
 
         return Results.Ok(new
         {
@@ -254,6 +284,47 @@ app.MapPost(
     {
         meeting.Id
     });
+});
+
+// Kayıt başlar başlamaz çağrılır: EndedAt = null olan bir toplantı satırı
+// oluşturur, döndürdüğü id her /api/transcribe çağrısına eklenip parçaların
+// canlı olarak DB'ye yazılmasını sağlar (bkz. TranscribeAsync ve
+// PATCH /api/meetings/{id}/finalize). Bu sayede kayıt bitmeden tarayıcı
+// çökerse/kapanırsa bile o ana kadarki transkript kaybolmaz.
+app.MapPost(
+    "/api/meetings/start",
+    async (
+        StartMeetingRequest request,
+        IMeetingService meetingService
+    ) =>
+{
+    var meeting = await meetingService.StartMeetingAsync(request.Title, request.StartedAt);
+
+    return Results.Ok(new
+    {
+        meeting.Id
+    });
+});
+
+// Kayıt bitip yapay zekâ özeti hazır olunca çağrılır: /api/meetings/start ile
+// oluşturulan toplantıyı gerçek başlık, bitiş zamanı ve özetle tamamlar.
+app.MapPatch(
+    "/api/meetings/{id:guid}/finalize",
+    async (
+        Guid id,
+        FinalizeMeetingRequest request,
+        IMeetingService meetingService
+    ) =>
+{
+    var found = await meetingService.FinalizeMeetingAsync(
+        id, request.Title, request.EndedAt, request.Summary);
+
+    if (!found)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.NoContent();
 });
 
 app.MapGet(
@@ -405,6 +476,10 @@ public record ChatRequest(string Question);
 public record ChatResponse(string Answer);
 
 public record SummarizeRequest(string Transcript);
+
+public record StartMeetingRequest(string Title, DateTime StartedAt);
+
+public record FinalizeMeetingRequest(string Title, DateTime EndedAt, MeetingSummary Summary);
 
 public class SummarizeResponse
 {
