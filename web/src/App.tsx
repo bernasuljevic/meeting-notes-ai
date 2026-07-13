@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Recorder } from "./components/Recorder";
 import { MeetingHistory } from "./components/MeetingHistory";
 import { MeetingDetail } from "./components/MeetingDetail";
+import { ModeToggle } from "./components/mode-toggle";
 import {
   getMeeting,
   type MeetingDetail as MeetingDetailModel,
@@ -74,28 +75,34 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
 
       {/* HEADER */}
 
-      <header className="border-b border-slate-200 bg-white shadow-sm">
+      <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
 
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5">
 
           <div>
 
-            <h1 className="text-3xl font-bold text-slate-900">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
               Toplantı Notları AI
             </h1>
 
-            <p className="mt-1 text-slate-500">
+            <p className="mt-1 text-slate-500 dark:text-slate-400">
               Yapay zekâ destekli toplantı asistanı
             </p>
 
           </div>
 
-          <div className="rounded-full bg-green-100 px-4 py-2 text-sm font-medium text-green-700">
-            ✅ {apiMessage}
+          <div className="flex items-center gap-3">
+
+            <div className="rounded-full bg-green-100 px-4 py-2 text-sm font-medium text-green-700 dark:bg-green-500/15 dark:text-green-400">
+              ✅ {apiMessage}
+            </div>
+
+            <ModeToggle />
+
           </div>
 
         </div>
@@ -130,9 +137,9 @@ function App() {
 
           {loadingMeeting ? (
 
-            <div className="rounded-2xl bg-white p-8 shadow">
+            <div className="rounded-2xl bg-white p-8 shadow dark:bg-slate-900">
 
-              <p className="text-slate-500">
+              <p className="text-slate-500 dark:text-slate-400">
                 Toplantı yükleniyor...
               </p>
 

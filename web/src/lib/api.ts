@@ -127,6 +127,65 @@ export async function getMeeting(id: string): Promise<MeetingDetail> {
   return await response.json();
 }
 
+/**
+ * Toplantıyı (transkript + yapay zekâ özeti) Word (.docx) veya PDF olarak indirir.
+ * Dosya backend'de üretilir, burada sadece blob olarak alınıp tarayıcıya indirilir.
+ */
+export async function downloadMeetingExport(
+  id: string,
+  format: "docx" | "pdf",
+  fileName: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}/export/${format}`);
+
+  if (!response.ok) {
+    throw new Error(
+      format === "docx" ? "Word dosyası oluşturulamadı." : "PDF dosyası oluşturulamadı."
+    );
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${fileName}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Toplantı transkripti hakkında serbest metin bir soru sorar ve yapay zekâ yanıtını döner.
+ * Her soru bağımsız değerlendirilir; önceki soru/cevaplar backend'e gönderilmez
+ * (sohbet geçmişi sadece ekranda, istemci tarafında gösterim amaçlı tutulur).
+ */
+export async function askMeetingQuestion(id: string, question: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!response.ok) {
+    let detail = "Soru cevaplanamadı.";
+    try {
+      const errorBody = await response.json();
+      detail = errorBody.detail ?? errorBody.error ?? detail;
+    } catch {
+      // JSON parse edilemezse varsayılan mesaj kullanılır
+    }
+    throw new Error(detail);
+  }
+
+  const data = await response.json();
+  return data.answer as string;
+}
+
 export interface CreateMeetingRequest {
   title: string;
   startedAt: string;

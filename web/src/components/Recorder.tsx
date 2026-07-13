@@ -120,7 +120,7 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
         {/* Kontroller */}
         <CardContent className="space-y-6 px-6 py-8 sm:px-10">
           {/* KVKK / gizlilik bilgilendirmesi */}
-          <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-700">
+          <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
               Bu toplantı kaydedilmektedir. Katılımcıları bilgilendirin ve
@@ -154,7 +154,7 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
             </Button>
 
             {/* Süre göstergesi */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-600">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
               <Clock3 className="h-4 w-4" />
               {formatDuration(durationSec)}
             </div>
@@ -163,19 +163,19 @@ export function Recorder({ onMeetingSaved }: RecorderProps) {
           <Separator />
 
           {/* Ses seviyesi kartı */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-800/40">
             <LevelMeter level={level} isRecording={isRecording} />
           </div>
 
           {isFinalizing && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+            <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
               <p>Son parçalar işleniyor ve yapay zekâ özeti oluşturuluyor...</p>
             </div>
           )}
 
           {error && (
-            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <p>{error}</p>
             </div>

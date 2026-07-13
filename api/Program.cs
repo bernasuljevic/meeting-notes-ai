@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using api.Services;
 using System.Collections.Generic;
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -43,6 +45,8 @@ if (provider == "auto")
     provider = string.IsNullOrWhiteSpace(claudeApiKey) ? "plaintext" : "claude";
 }
 
+// Sohbet servisi de aynı "Summarization:Provider" ayarını kullanır — özetleme için
+// hangi sağlayıcı seçildiyse, toplantıyla ilgili soru-cevap sohbeti de onu kullanır.
 switch (provider)
 {
     case "ollama":
@@ -53,7 +57,14 @@ switch (provider)
             client.Timeout = TimeSpan.FromSeconds(300);
         });
 
-        Console.WriteLine("Özetleme servisi: Ollama (yerel LLM) kullanılacak.");
+        builder.Services.AddHttpClient<IMeetingChatService, OllamaChatService>(client =>
+        {
+            var baseUrl = builder.Configuration["Ollama:BaseUrl"] ?? "http://localhost:11434/";
+            client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+            client.Timeout = TimeSpan.FromSeconds(300);
+        });
+
+        Console.WriteLine("Özetleme ve sohbet servisi: Ollama (yerel LLM) kullanılacak.");
         break;
 
     case "claude":
@@ -61,9 +72,10 @@ switch (provider)
         {
             Console.WriteLine(
                 "Uyarı: Summarization:Provider 'claude' olarak ayarlı ama Claude:ApiKey boş — " +
-                "PlainTextSummarizationService'e düşülüyor.");
+                "PlainText servislerine düşülüyor.");
 
             builder.Services.AddSingleton<ISummarizationService, PlainTextSummarizationService>();
+            builder.Services.AddSingleton<IMeetingChatService, PlainTextChatService>();
         }
         else
         {
@@ -73,18 +85,26 @@ switch (provider)
                 client.Timeout = TimeSpan.FromSeconds(300);
             });
 
-            Console.WriteLine("Özetleme servisi: Claude API kullanılacak.");
+            builder.Services.AddHttpClient<IMeetingChatService, ClaudeChatService>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.anthropic.com/");
+                client.Timeout = TimeSpan.FromSeconds(300);
+            });
+
+            Console.WriteLine("Özetleme ve sohbet servisi: Claude API kullanılacak.");
         }
         break;
 
     default:
         builder.Services.AddSingleton<ISummarizationService, PlainTextSummarizationService>();
+        builder.Services.AddSingleton<IMeetingChatService, PlainTextChatService>();
 
-        Console.WriteLine("Özetleme servisi: PlainTextSummarizationService (yer tutucu).");
+        Console.WriteLine("Özetleme ve sohbet servisi: PlainText (yer tutucu).");
         break;
 }
 
 builder.Services.AddScoped<IMeetingService, MeetingService>();
+builder.Services.AddSingleton<IMeetingExportService, MeetingExportService>();
 
 // CORS: sadece Vite dev sunucusuna izin ver (AllowAnyOrigin prod'da risklidir)
 builder.Services.AddCors(options =>
@@ -289,7 +309,100 @@ app.MapDelete("/api/meetings/{id:guid}", async (
     return Results.NoContent();
 });
 
+app.MapGet("/api/meetings/{id:guid}/export/docx", async (
+    Guid id,
+    IMeetingService meetingService,
+    IMeetingExportService exportService) =>
+{
+    var meeting = await meetingService.GetMeetingAsync(id);
+
+    if (meeting is null)
+    {
+        return Results.NotFound();
+    }
+
+    var bytes = exportService.GenerateDocx(meeting);
+    var fileName = $"{SanitizeFileName(meeting.Title)}.docx";
+
+    return Results.File(
+        bytes,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        fileName);
+});
+
+app.MapGet("/api/meetings/{id:guid}/export/pdf", async (
+    Guid id,
+    IMeetingService meetingService,
+    IMeetingExportService exportService) =>
+{
+    var meeting = await meetingService.GetMeetingAsync(id);
+
+    if (meeting is null)
+    {
+        return Results.NotFound();
+    }
+
+    var bytes = exportService.GeneratePdf(meeting);
+    var fileName = $"{SanitizeFileName(meeting.Title)}.pdf";
+
+    return Results.File(bytes, "application/pdf", fileName);
+});
+
+app.MapPost("/api/meetings/{id:guid}/chat", async (
+    Guid id,
+    ChatRequest request,
+    IMeetingService meetingService,
+    IMeetingChatService chatService,
+    ILogger<Program> logger) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        return Results.BadRequest(new { error = "Soru boş olamaz." });
+    }
+
+    var meeting = await meetingService.GetMeetingAsync(id);
+
+    if (meeting is null)
+    {
+        return Results.NotFound();
+    }
+
+    var transcript = string.Join(" ", meeting.TranscriptSegments.Select(s => s.Text));
+
+    if (string.IsNullOrWhiteSpace(transcript))
+    {
+        return Results.Ok(new ChatResponse("Bu toplantı için konuşma metni bulunamadı."));
+    }
+
+    try
+    {
+        var answer = await chatService.AskAsync(transcript, request.Question);
+        return Results.Ok(new ChatResponse(answer));
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Toplantı sohbeti sırasında hata oluştu.");
+        return Results.Problem(
+            title: "Soru cevaplanamadı",
+            detail: ex.Message,
+            statusCode: 500
+        );
+    }
+});
+
 app.Run();
+
+static string SanitizeFileName(string input)
+{
+    var invalidChars = Path.GetInvalidFileNameChars();
+    var sanitized = new string(input.Select(c => invalidChars.Contains(c) ? '_' : c).ToArray()).Trim();
+
+    return string.IsNullOrWhiteSpace(sanitized) ? "toplanti" : sanitized;
+}
+
+public record ChatRequest(string Question);
+
+public record ChatResponse(string Answer);
 
 public record SummarizeRequest(string Transcript);
 

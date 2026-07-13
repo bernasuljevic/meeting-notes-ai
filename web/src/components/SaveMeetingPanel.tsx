@@ -38,8 +38,8 @@ export function SaveMeetingPanel({ onSave }: SaveMeetingPanelProps) {
 
       <CardContent className="space-y-5 py-6">
         <div>
-          <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-            <Type className="h-4 w-4 text-slate-500" />
+          <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <Type className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             Toplantı Başlığı
           </label>
 
@@ -48,7 +48,7 @@ export function SaveMeetingPanel({ onSave }: SaveMeetingPanelProps) {
             value={meetingTitle}
             onChange={(e) => setMeetingTitle(e.target.value)}
             placeholder="Örn: Haftalık Ekip Toplantısı"
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/20"
           />
         </div>
 

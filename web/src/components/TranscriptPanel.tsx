@@ -24,12 +24,12 @@ export function TranscriptPanel({
 }: TranscriptPanelProps) {
   if (error) {
     return (
-      <Card className="border-red-200 bg-red-50">
+      <Card className="border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10">
         <CardContent className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
           <div>
-            <h3 className="font-semibold text-red-700">Transkripsiyon Hatası</h3>
-            <p className="mt-1 text-sm text-red-600">{error}</p>
+            <h3 className="font-semibold text-red-700 dark:text-red-300">Transkripsiyon Hatası</h3>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-300/90">{error}</p>
           </div>
         </CardContent>
       </Card>
@@ -66,13 +66,13 @@ export function TranscriptPanel({
       </CardHeader>
 
       <CardContent className="py-6">
-        <ScrollArea className="h-72 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <ScrollArea className="h-72 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800/60">
           {transcript ? (
-            <p className="whitespace-pre-wrap leading-8 text-slate-700">
+            <p className="whitespace-pre-wrap leading-8 text-slate-700 dark:text-slate-300">
               {transcript}
             </p>
           ) : (
-            <p className="text-sm text-slate-500">Transkript oluşturuluyor...</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Transkript oluşturuluyor...</p>
           )}
         </ScrollArea>
       </CardContent>
