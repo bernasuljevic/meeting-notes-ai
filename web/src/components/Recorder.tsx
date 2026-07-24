@@ -264,9 +264,10 @@ export function Recorder({
               <div className="flex items-start gap-3">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>
-                  Yapay zekâ özeti oluşturulmadı: giriş yapılmamış ya da AI
-                  ayarları tamamlanmamış. Toplantıyı yine de transkriptle
-                  kaydedebilirsin.
+                  Bu toplantı için yapay zekâ özeti oluşturulamadı — giriş/AI
+                  ayarları eksik olabilir ya da geçici bir hata oluşmuş olabilir
+                  (altta ayrıntı varsa görebilirsin). Toplantıyı yine de
+                  transkriptle kaydedebilirsin.
                 </p>
               </div>
 

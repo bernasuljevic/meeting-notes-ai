@@ -338,8 +338,22 @@ export function useRecorder(authToken: string | null): UseRecorderReturn {
 
         if (finalTranscript.length > 0) {
           if (authTokenRef.current) {
-            const summary = await summarizeTranscript(finalTranscript, authTokenRef.current);
-            setNotes(summary);
+            try {
+              const summary = await summarizeTranscript(finalTranscript, authTokenRef.current);
+              setNotes(summary);
+            } catch (summarizeErr) {
+              // AI çağrısı başarısız oldu (geçersiz/tükenmiş API anahtarı, ağ
+              // hatası, sağlayıcı tarafı hata vb.) — kullanıcıyı transkriptiyle
+              // birlikte kilitli bırakmıyoruz: aiSkipped'i true yaparak
+              // toplantının yine de kaydedilebilmesini sağlıyoruz, ama hatayı
+              // da gösteriyoruz ki neden özet gelmediğini anlasın.
+              const message =
+                summarizeErr instanceof Error
+                  ? summarizeErr.message
+                  : "Özet oluşturulamadı.";
+              setError(message);
+              setAiSkipped(true);
+            }
           } else {
             // Giriş yapılmamış/AI ayarlanmamış: özetleme adımını sessizce (hata
             // göstermeden) atla. Recorder, aiSkipped'e bakıp bilgilendirici bir
