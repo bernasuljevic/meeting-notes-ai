@@ -1,5 +1,18 @@
 const API_BASE_URL = "";
 
+/**
+ * Bir fetch yanıtı başarısız olduğunda, backend'in döndüğü { error } / { detail } /
+ * { message } gövdesinden okunabilir bir hata metni çıkarır; yoksa fallback'i kullanır.
+ */
+async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
+  try {
+    const errorBody = await response.json();
+    return errorBody.error ?? errorBody.detail ?? errorBody.message ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export interface TranscribeResponse {
   seq: number;
   fileName: string;
@@ -60,24 +73,29 @@ export interface SummarizeResponse {
   keyDiscussionPoints: string[];
 }
 
-export async function summarizeTranscript(transcript: string): Promise<SummarizeResponse> {
+/**
+ * Not: /api/summarize artık giriş yapmayı zorunlu kılıyor (yapay zekâ, çağıran
+ * kullanıcının kendi sağlayıcı/model/token ayarıyla çalışıyor) — bu yüzden
+ * `token` zorunlu bir parametre. Giriş yapılmamışsa bu fonksiyon hiç çağrılmamalı;
+ * çağıran taraf (useRecorder) bunu zaten kontrol ediyor.
+ */
+export async function summarizeTranscript(
+  transcript: string,
+  token: string
+): Promise<SummarizeResponse> {
   const response = await fetch(`${API_BASE_URL}/api/summarize`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ transcript }),
   });
 
   if (!response.ok) {
-    let detail = `İstek başarısız: ${response.status}`;
-    try {
-      const errorBody = await response.json();
-      detail = errorBody.detail ?? errorBody.error ?? detail;
-    } catch {
-      // JSON parse edilemezse varsayılan mesaj kullanılır
-    }
-    throw new Error(detail);
+    throw new Error(
+      await parseErrorDetail(response, `İstek başarısız: ${response.status}`)
+    );
   }
 
   return response.json();
@@ -179,24 +197,26 @@ export async function downloadMeetingExport(
  * Her soru bağımsız değerlendirilir; önceki soru/cevaplar backend'e gönderilmez
  * (sohbet geçmişi sadece ekranda, istemci tarafında gösterim amaçlı tutulur).
  */
-export async function askMeetingQuestion(id: string, question: string): Promise<string> {
+/**
+ * Not: /api/meetings/{id}/chat de giriş yapmayı zorunlu kılıyor, bkz.
+ * summarizeTranscript'teki açıklama. `token` zorunlu.
+ */
+export async function askMeetingQuestion(
+  id: string,
+  question: string,
+  token: string
+): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/api/meetings/${id}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ question }),
   });
 
   if (!response.ok) {
-    let detail = "Soru cevaplanamadı.";
-    try {
-      const errorBody = await response.json();
-      detail = errorBody.detail ?? errorBody.error ?? detail;
-    } catch {
-      // JSON parse edilemezse varsayılan mesaj kullanılır
-    }
-    throw new Error(detail);
+    throw new Error(await parseErrorDetail(response, "Soru cevaplanamadı."));
   }
 
   const data = await response.json();
@@ -208,7 +228,9 @@ export interface CreateMeetingRequest {
   startedAt: string;
   endedAt: string | null;
   transcript: string;
-  summary: SummarizeResponse;
+  // Backend'de nullable: giriş yapılmadan/AI ayarlanmadan kaydedilen bir
+  // toplantıda AI özeti hiç üretilmemiş olabilir (bkz. Recorder.tsx'teki aiSkipped).
+  summary: SummarizeResponse | null;
 }
 
 export interface CreateMeetingResponse {
@@ -283,5 +305,104 @@ export async function finalizeMeeting(id: string, request: FinalizeMeetingReques
 
   if (!response.ok) {
     throw new Error("Toplantı tamamlanamadı.");
+  }
+}
+
+// --- Giriş (login) + kullanıcıya özel AI ayarları ---
+// Kayıt/transkript/toplantı listesi giriş yapmadan da kullanılabiliyor; sadece
+// yapay zekâ özellikleri (özetleme, toplantı sohbeti) giriş + AI ayarı gerektiriyor.
+
+export interface AuthResponse {
+  token: string;
+  username: string;
+}
+
+export interface MeResponse {
+  username: string;
+  hasAiConfigured: boolean;
+  aiProvider: string | null;
+  aiModel: string | null;
+}
+
+export async function registerUser(
+  username: string,
+  password: string
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, "Kayıt oluşturulamadı."));
+  }
+
+  return response.json();
+}
+
+export async function loginUser(
+  username: string,
+  password: string
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await parseErrorDetail(response, "Kullanıcı adı ya da şifre hatalı.")
+    );
+  }
+
+  return response.json();
+}
+
+export async function getMe(token: string): Promise<MeResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Kullanıcı bilgisi alınamadı.");
+  }
+
+  return response.json();
+}
+
+/**
+ * AI sağlayıcı/model/token ayarlarını günceller. `apiToken` boş bırakılırsa
+ * (undefined ya da boş string) backend mevcut şifreli token'a dokunmuyor —
+ * "token'ı değiştirmek istemiyorsan boş bırak" davranışı bu sayede çalışıyor.
+ */
+export async function updateAiSettings(
+  token: string,
+  provider: string,
+  model: string,
+  apiToken?: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/ai-settings`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      provider,
+      model,
+      apiToken: apiToken && apiToken.length > 0 ? apiToken : null,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, "AI ayarları kaydedilemedi."));
   }
 }

@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Loader2, LogOut, Sparkles } from "lucide-react";
 import { Recorder } from "./components/Recorder";
 import { MeetingHistory } from "./components/MeetingHistory";
 import { MeetingDetail } from "./components/MeetingDetail";
 import { MeetingDetailSkeleton } from "./components/MeetingDetailSkeleton";
 import { ModeToggle } from "./components/mode-toggle";
+import { AuthGate } from "./components/AuthGate";
+import { AiSettingsDialog } from "./components/AiSettingsDialog";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "./lib/AuthContext";
 import {
   getMeeting,
   type MeetingDetail as MeetingDetailModel,
@@ -13,6 +18,11 @@ import {
 const API_BASE_URL = "";
 
 function App() {
+  const { isLoading: isAuthLoading, isAuthenticated, username, hasAiConfigured, logout } =
+    useAuth();
+
+  const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = useState(false);
+
   const [apiMessage, setApiMessage] = useState("Bağlanıyor...");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -95,6 +105,22 @@ function App() {
     setSelectedMeetingId(null);
   }
 
+  // Kayıtlı token'ın geçerli olup olmadığı /api/auth/me ile doğrulanana kadar
+  // (sayfa her yenilendiğinde bir anlık) hiçbir ekranı yanlışlıkla gösterme.
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-950">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // Uygulamanın TAMAMI giriş arkasında: giriş yapılmamışsa sadece giriş/kayıt
+  // ekranını göster, kayıt/toplantı geçmişi dahil hiçbir şey görünmesin.
+  if (!isAuthenticated) {
+    return <AuthGate />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
 
@@ -120,6 +146,39 @@ function App() {
 
             <div className="rounded-full bg-green-100 px-4 py-2 text-sm font-medium text-green-700 dark:bg-green-500/15 dark:text-green-400">
               ✅ {apiMessage}
+            </div>
+
+            {/* Bu blok her zaman giriş yapılmışken render edilir (App.tsx'in
+                üstünde !isAuthenticated ise zaten AuthGate döndürülüyor). */}
+            <div className="flex items-center gap-2">
+              <span className="hidden text-sm text-slate-600 sm:inline dark:text-slate-300">
+                Merhaba, {username}
+              </span>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setAiSettingsDialogOpen(true)}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                AI Ayarları
+                {!hasAiConfigured && (
+                  <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5"
+                onClick={logout}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Çıkış
+              </Button>
             </div>
 
             <ModeToggle />
@@ -166,12 +225,14 @@ function App() {
             <MeetingDetail
               meeting={selectedMeeting}
               onBack={handleNewMeeting}
+              onOpenAiSettings={() => setAiSettingsDialogOpen(true)}
             />
 
           ) : (
 
             <Recorder
               onMeetingSaved={handleMeetingSaved}
+              onOpenAiSettings={() => setAiSettingsDialogOpen(true)}
             />
 
           )}
@@ -192,6 +253,11 @@ function App() {
         </button>
 
       )}
+
+      <AiSettingsDialog
+        open={aiSettingsDialogOpen}
+        onOpenChange={setAiSettingsDialogOpen}
+      />
 
     </div>
   );

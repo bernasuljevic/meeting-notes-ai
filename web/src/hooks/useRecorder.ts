@@ -1,5 +1,5 @@
 // web/src/hooks/useRecorder.ts
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { downsampleBuffer, mergeBuffers, calculateRMS, calculateRMSLevel, encodeWAV } from "../lib/audio";
 import { transcribeAudio, summarizeTranscript, type SummarizeResponse } from "../lib/api";
 
@@ -59,6 +59,10 @@ interface UseRecorderReturn {
   durationSec: number; // kayıt süresi (saniye), her saniye bir artar
   transcript: string; // seq sırasına göre birleşmiş, canlı güncellenen transkript
   notes: SummarizeResponse | null;
+  // Giriş yapılmamış ya da AI ayarları (sağlayıcı/model) tamamlanmamışsa, transkript
+  // hazır olduğunda yapay zekâ özeti hiç DENENMEDEN atlanır — bu durumda `notes` null
+  // kalır ama bu bir HATA değildir, `aiSkipped` true olur (error'dan kasıtlı olarak ayrı).
+  aiSkipped: boolean;
   audioBlob: Blob | null; // tüm kaydın birleşik WAV hali (yerel oynatma/indirme için)
   error: string | null;
   // meetingId (opsiyonel): startMeeting ile önceden oluşturulmuş bir toplantının
@@ -68,15 +72,31 @@ interface UseRecorderReturn {
   stopRecording: () => void;
 }
 
-export function useRecorder(): UseRecorderReturn {
+/**
+ * `authToken`: giriş yapılmışsa geçerli JWT, yapılmamışsa null. Yapay zekâ özeti
+ * SADECE bu token doluysa denenir; null'sa özetleme adımı ağ isteği yapmadan
+ * atlanır (`aiSkipped` true olur). Değeri bir ref'te tutuyoruz çünkü kayıt bitip
+ * `stopRecording`'in finalize callback'i çalıştığında (kayıt süresince kullanıcı
+ * giriş yapmış/çıkmış olabilir) en GÜNCEL token'ı kullanmak istiyoruz, `stopRecording`
+ * her render'da yeniden oluşturulan bir closure olmadığı için (useCallback ile
+ * sabitlendiği için) doğrudan bir prop'a değil ref'e güveniyoruz.
+ */
+export function useRecorder(authToken: string | null): UseRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [level, setLevel] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [notes, setNotes] = useState<SummarizeResponse | null>(null);
+  const [aiSkipped, setAiSkipped] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const authTokenRef = useRef<string | null>(authToken);
+
+  useEffect(() => {
+    authTokenRef.current = authToken;
+  }, [authToken]);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -177,6 +197,7 @@ export function useRecorder(): UseRecorderReturn {
     setAudioBlob(null);
     setTranscript("");
     setNotes(null);
+    setAiSkipped(false);
     setDurationSec(0);
 
     fullRecordingRef.current = [];
@@ -316,8 +337,15 @@ export function useRecorder(): UseRecorderReturn {
         }
 
         if (finalTranscript.length > 0) {
-          const summary = await summarizeTranscript(finalTranscript);
-          setNotes(summary);
+          if (authTokenRef.current) {
+            const summary = await summarizeTranscript(finalTranscript, authTokenRef.current);
+            setNotes(summary);
+          } else {
+            // Giriş yapılmamış/AI ayarlanmamış: özetleme adımını sessizce (hata
+            // göstermeden) atla. Recorder, aiSkipped'e bakıp bilgilendirici bir
+            // banner gösterip toplantının yine de kaydedilebilmesini sağlıyor.
+            setAiSkipped(true);
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Notlar oluşturulamadı.";
@@ -344,6 +372,7 @@ export function useRecorder(): UseRecorderReturn {
     durationSec,
     transcript,
     notes,
+    aiSkipped,
     audioBlob,
     error,
     startRecording,

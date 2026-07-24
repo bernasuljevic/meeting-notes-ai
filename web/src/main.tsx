@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import './index.css'
 import App from './App.tsx'
 import { Toaster } from './components/ui/sonner'
+import { AuthProvider } from './lib/AuthContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -13,8 +14,10 @@ createRoot(document.getElementById('root')!).render(
       enableSystem={false}
       storageKey="toplanti-notlari-theme"
     >
-      <App />
-      <Toaster richColors position="top-right" />
+      <AuthProvider>
+        <App />
+        <Toaster richColors position="top-right" />
+      </AuthProvider>
     </ThemeProvider>
   </StrictMode>,
 )

@@ -38,13 +38,20 @@ public class MeetingService : IMeetingService
                 Text = request.Transcript
             });
 
-        meeting.Notes.Add(
-            new api.Models.MeetingNote
-            {
-                Id = Guid.NewGuid(),
-                MarkdownContent = BuildMarkdownSummary(request.Summary),
-                Model = "Placeholder AI"
-            });
+        // Giriş yapmadan/AI ayarı olmadan kaydeden bir kullanıcı için özet hiç
+        // üretilmemiş olabilir (request.Summary null) — bu durumda not eklemeden
+        // sadece transkripti kaydediyoruz; MeetingDetail ekranı zaten notu boşsa
+        // "Henüz yapay zekâ özeti oluşturulmamış" mesajını gösteriyor.
+        if (request.Summary is not null)
+        {
+            meeting.Notes.Add(
+                new api.Models.MeetingNote
+                {
+                    Id = Guid.NewGuid(),
+                    MarkdownContent = BuildMarkdownSummary(request.Summary),
+                    Model = "Placeholder AI"
+                });
+        }
 
         _context.Meetings.Add(meeting);
 
@@ -79,21 +86,21 @@ public class MeetingService : IMeetingService
         string text,
         CancellationToken cancellationToken = default)
     {
-        var meetingExists = await _context.Meetings
-            .AnyAsync(m => m.Id == meetingId, cancellationToken);
+        var meeting = await _context.Meetings
+            .FirstOrDefaultAsync(m => m.Id == meetingId, cancellationToken);
 
-        if (!meetingExists)
+        if (meeting is null)
         {
             return false;
         }
 
-        _context.TranscriptSegments.Add(new api.Models.TranscriptSegment
-        {
-            Id = Guid.NewGuid(),
-            MeetingId = meetingId,
-            Seq = seq,
-            Text = text
-        });
+        meeting.TranscriptSegments.Add(
+            new api.Models.TranscriptSegment
+            {
+                Id = Guid.NewGuid(),
+                Seq = seq,
+                Text = text
+            });
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -118,13 +125,13 @@ public class MeetingService : IMeetingService
         meeting.Title = title;
         meeting.EndedAt = endedAt;
 
-        _context.MeetingNotes.Add(new api.Models.MeetingNote
-        {
-            Id = Guid.NewGuid(),
-            MeetingId = meetingId,
-            MarkdownContent = BuildMarkdownSummary(summary),
-            Model = "Placeholder AI"
-        });
+        meeting.Notes.Add(
+            new api.Models.MeetingNote
+            {
+                Id = Guid.NewGuid(),
+                MarkdownContent = BuildMarkdownSummary(summary),
+                Model = "Placeholder AI"
+            });
 
         await _context.SaveChangesAsync(cancellationToken);
 

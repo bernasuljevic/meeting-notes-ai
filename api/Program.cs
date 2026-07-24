@@ -3,7 +3,12 @@ using api.Options;
 using api.Data;
 using Microsoft.EntityFrameworkCore;
 using api.Services;
+using api.Services.Auth;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
@@ -106,6 +111,55 @@ switch (provider)
 builder.Services.AddScoped<IMeetingService, MeetingService>();
 builder.Services.AddSingleton<IMeetingExportService, MeetingExportService>();
 
+// --- Login + kullanıcıya özel AI ayarları ---
+// Yukarıdaki ISummarizationService/IMeetingChatService seçimi sunucu genelinde
+// SABİT bir sağlayıcıya bağlanıyor. Login gerektiren /api/summarize ve
+// /api/meetings/{id}/chat uçları artık bunu kullanmıyor; bunun yerine, giriş
+// yapan kullanıcının kendi sağlayıcı/model/token tercihiyle çalışan
+// IUserAiClient'ı kullanıyor (bkz. Services/Auth/UserAiClient.cs).
+builder.Services.Configure<JwtOptions>(
+    builder.Configuration.GetSection(JwtOptions.SectionName));
+
+builder.Services.AddDataProtection();
+builder.Services.AddHttpClient(); // IHttpClientFactory (UserAiClient için)
+
+builder.Services.AddSingleton<ITokenProtector, TokenProtector>();
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserAiClient, UserAiClient>();
+
+var jwtSecret = builder.Configuration["Jwt:Secret"];
+
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret ayarı appsettings.json içinde tanımlı olmalı (login token'larını imzalamak için).");
+}
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Varsayılan davranışta ASP.NET Core, token'daki kısa "sub" claim'ini
+        // HttpContext.User.Claims içine uzun bir isimle (ClaimTypes.NameIdentifier)
+        // eşler. GetUserId aşağıda tam olarak "sub" adını aradığı için, bu eşlemeyi
+        // kapatıyoruz — yoksa kullanıcı doğru giriş yapmış olsa bile GetUserId null
+        // döner ve istekler yanlışlıkla 401 alır.
+        options.MapInboundClaims = false;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 // CORS: sadece Vite dev sunucusuna izin ver (AllowAnyOrigin prod'da risklidir)
 builder.Services.AddCors(options =>
 {
@@ -128,6 +182,9 @@ app.Services.GetRequiredService<TranscriptionService>();
 
 app.UseCors("AllowReact");
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -142,12 +199,103 @@ app.MapGet("/api/ping", () =>
     });
 });
 
+// --- Auth uçları ---
+// Kayıt ve transkript/toplantı listesi login gerektirmez; sadece AI özellikleri
+// (özet çıkarma, toplantıyla soru-cevap) giriş yapmayı ve AI ayarlarının
+// (sağlayıcı + model + gerekiyorsa token) tamamlanmış olmasını gerektirir.
+
+app.MapPost("/api/auth/register", async (
+    RegisterRequest request,
+    IUserService userService,
+    IJwtTokenService jwtTokenService) =>
+{
+    var (success, error, user) = await userService.RegisterAsync(request.Username, request.Password);
+
+    if (!success || user is null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    var token = jwtTokenService.GenerateToken(user);
+
+    return Results.Ok(new AuthResponse(token, user.Username));
+});
+
+app.MapPost("/api/auth/login", async (
+    LoginRequest request,
+    IUserService userService,
+    IJwtTokenService jwtTokenService) =>
+{
+    var user = await userService.AuthenticateAsync(request.Username, request.Password);
+
+    if (user is null)
+    {
+        return Results.Json(new { error = "Kullanıcı adı ya da şifre hatalı." }, statusCode: 401);
+    }
+
+    var token = jwtTokenService.GenerateToken(user);
+
+    return Results.Ok(new AuthResponse(token, user.Username));
+});
+
+app.MapGet("/api/auth/me", async (
+    HttpContext httpContext,
+    IUserService userService) =>
+{
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await userService.GetByIdAsync(userId.Value);
+
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok(new MeResponse(
+        user.Username,
+        user.HasAiConfigured,
+        user.AiProvider,
+        user.AiModel));
+}).RequireAuthorization();
+
+app.MapPut("/api/auth/ai-settings", async (
+    HttpContext httpContext,
+    UpdateAiSettingsRequest request,
+    IUserService userService) =>
+{
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Provider) || string.IsNullOrWhiteSpace(request.Model))
+    {
+        return Results.BadRequest(new { error = "Sağlayıcı ve model adı boş olamaz." });
+    }
+
+    var updated = await userService.UpdateAiSettingsAsync(
+        userId.Value, request.Provider, request.Model, request.ApiToken);
+
+    if (!updated)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.NoContent();
+}).RequireAuthorization();
+
 app.MapPost(
     "/api/transcribe",
     async (
         HttpRequest request,
-        TranscriptionService transcriptionService,
-        IMeetingService meetingService
+        TranscriptionService transcriptionService
     ) =>
 {
     var form = await request.ReadFormAsync();
@@ -178,16 +326,6 @@ app.MapPost(
     // istemciler bu alanı hiç göndermeyebilir — geriye dönük uyumlu, opsiyonel.
     var previousContext = form["previousContext"].ToString();
 
-    // Opsiyonel: bu parçanın ait olduğu toplantının kimliği (bkz. POST
-    // /api/meetings/start). Verilirse, transkript edilir edilmez o toplantıya
-    // kalıcı olarak da yazılır — kayıt bitmeden tarayıcı çökerse/kapanırsa bile
-    // o ana kadarki transkript kaybolmasın diye. Eski istemciler veya toplantı
-    // başlatma isteği başarısız olduysa bu alan boş gelebilir; geriye dönük
-    // uyumlu, opsiyonel.
-    Guid? meetingId = Guid.TryParse(form["meetingId"], out var parsedMeetingId)
-        ? parsedMeetingId
-        : null;
-
     Console.WriteLine(
         $"Ses geldi: {audio.FileName} - {audio.Length} byte - seq={seq}"
     );
@@ -200,19 +338,6 @@ app.MapPost(
         var transcript =
             await transcriptionService
                 .TranscribeAsync(stream, previousContext);
-
-        if (meetingId.HasValue)
-        {
-            var appended = await meetingService.AppendTranscriptSegmentAsync(
-                meetingId.Value, seq, transcript);
-
-            if (!appended)
-            {
-                Console.WriteLine(
-                    $"Uyarı: meetingId={meetingId} bulunamadı, parça #{seq} DB'ye yazılamadı (sadece istemciye döndü)."
-                );
-            }
-        }
 
         return Results.Ok(new
         {
@@ -238,7 +363,9 @@ app.MapPost(
 
 app.MapPost("/api/summarize", async (
     SummarizeRequest request,
-    ISummarizationService summarizationService,
+    HttpContext httpContext,
+    IUserService userService,
+    IUserAiClient userAiClient,
     ILogger<Program> logger) =>
 {
     if (string.IsNullOrWhiteSpace(request.Transcript))
@@ -246,9 +373,30 @@ app.MapPost("/api/summarize", async (
         return Results.BadRequest(new { error = "Transcript boş olamaz." });
     }
 
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var aiSettings = await userService.GetDecryptedAiSettingsAsync(userId.Value);
+
+    if (aiSettings is null)
+    {
+        return Results.BadRequest(new
+        {
+            error = "Önce AI ayarlarından bir sağlayıcı, model ve (gerekiyorsa) API token belirlemelisin."
+        });
+    }
+
     try
     {
-        var summary = await summarizationService.SummarizeAsync(request.Transcript);
+        var summary = await userAiClient.SummarizeAsync(
+            aiSettings.Value.Provider,
+            aiSettings.Value.Model,
+            aiSettings.Value.ApiToken,
+            request.Transcript);
 
         return Results.Ok(new SummarizeResponse
         {
@@ -268,7 +416,7 @@ app.MapPost("/api/summarize", async (
             statusCode: 500
         );
     }
-});
+}).RequireAuthorization();
 
 app.MapPost(
     "/api/meetings",
@@ -284,47 +432,6 @@ app.MapPost(
     {
         meeting.Id
     });
-});
-
-// Kayıt başlar başlamaz çağrılır: EndedAt = null olan bir toplantı satırı
-// oluşturur, döndürdüğü id her /api/transcribe çağrısına eklenip parçaların
-// canlı olarak DB'ye yazılmasını sağlar (bkz. TranscribeAsync ve
-// PATCH /api/meetings/{id}/finalize). Bu sayede kayıt bitmeden tarayıcı
-// çökerse/kapanırsa bile o ana kadarki transkript kaybolmaz.
-app.MapPost(
-    "/api/meetings/start",
-    async (
-        StartMeetingRequest request,
-        IMeetingService meetingService
-    ) =>
-{
-    var meeting = await meetingService.StartMeetingAsync(request.Title, request.StartedAt);
-
-    return Results.Ok(new
-    {
-        meeting.Id
-    });
-});
-
-// Kayıt bitip yapay zekâ özeti hazır olunca çağrılır: /api/meetings/start ile
-// oluşturulan toplantıyı gerçek başlık, bitiş zamanı ve özetle tamamlar.
-app.MapPatch(
-    "/api/meetings/{id:guid}/finalize",
-    async (
-        Guid id,
-        FinalizeMeetingRequest request,
-        IMeetingService meetingService
-    ) =>
-{
-    var found = await meetingService.FinalizeMeetingAsync(
-        id, request.Title, request.EndedAt, request.Summary);
-
-    if (!found)
-    {
-        return Results.NotFound();
-    }
-
-    return Results.NoContent();
 });
 
 app.MapGet(
@@ -422,13 +529,32 @@ app.MapGet("/api/meetings/{id:guid}/export/pdf", async (
 app.MapPost("/api/meetings/{id:guid}/chat", async (
     Guid id,
     ChatRequest request,
+    HttpContext httpContext,
     IMeetingService meetingService,
-    IMeetingChatService chatService,
+    IUserService userService,
+    IUserAiClient userAiClient,
     ILogger<Program> logger) =>
 {
     if (string.IsNullOrWhiteSpace(request.Question))
     {
         return Results.BadRequest(new { error = "Soru boş olamaz." });
+    }
+
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var aiSettings = await userService.GetDecryptedAiSettingsAsync(userId.Value);
+
+    if (aiSettings is null)
+    {
+        return Results.BadRequest(new
+        {
+            error = "Önce AI ayarlarından bir sağlayıcı, model ve (gerekiyorsa) API token belirlemelisin."
+        });
     }
 
     var meeting = await meetingService.GetMeetingAsync(id);
@@ -447,7 +573,13 @@ app.MapPost("/api/meetings/{id:guid}/chat", async (
 
     try
     {
-        var answer = await chatService.AskAsync(transcript, request.Question);
+        var answer = await userAiClient.AskAsync(
+            aiSettings.Value.Provider,
+            aiSettings.Value.Model,
+            aiSettings.Value.ApiToken,
+            transcript,
+            request.Question);
+
         return Results.Ok(new ChatResponse(answer));
     }
     catch (Exception ex)
@@ -459,7 +591,7 @@ app.MapPost("/api/meetings/{id:guid}/chat", async (
             statusCode: 500
         );
     }
-});
+}).RequireAuthorization();
 
 app.Run();
 
@@ -471,15 +603,17 @@ static string SanitizeFileName(string input)
     return string.IsNullOrWhiteSpace(sanitized) ? "toplanti" : sanitized;
 }
 
+static Guid? GetUserId(HttpContext httpContext)
+{
+    var subClaim = httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+    return Guid.TryParse(subClaim, out var userId) ? userId : null;
+}
+
 public record ChatRequest(string Question);
 
 public record ChatResponse(string Answer);
 
 public record SummarizeRequest(string Transcript);
-
-public record StartMeetingRequest(string Title, DateTime StartedAt);
-
-public record FinalizeMeetingRequest(string Title, DateTime EndedAt, MeetingSummary Summary);
 
 public class SummarizeResponse
 {
@@ -489,3 +623,13 @@ public class SummarizeResponse
     public List<string> OpenIssuesAndRisks { get; set; } = new();
     public List<string> KeyDiscussionPoints { get; set; } = new();
 }
+
+public record RegisterRequest(string Username, string Password);
+
+public record LoginRequest(string Username, string Password);
+
+public record AuthResponse(string Token, string Username);
+
+public record MeResponse(string Username, bool HasAiConfigured, string? AiProvider, string? AiModel);
+
+public record UpdateAiSettingsRequest(string Provider, string Model, string? ApiToken);
