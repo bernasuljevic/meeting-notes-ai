@@ -6,6 +6,7 @@ public interface IMeetingService
 {
     Task<Meeting> CreateMeetingAsync(
         CreateMeetingRequest request,
+        Guid? userId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -40,10 +41,20 @@ public interface IMeetingService
         MeetingSummary summary,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sadece verilen kullanıcıya ait toplantıları döner — başka bir kullanıcının
+    /// toplantıları asla listeye karışmaz.
+    /// </summary>
     Task<List<MeetingListItemDto>> GetMeetingsAsync(
+        Guid userId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Toplantı bulunsa bile, verilen kullanıcıya ait değilse null döner (var olup
+    /// olmadığını dahi sızdırmamak için "yetkisiz" yerine "bulunamadı" davranışı).
+    /// </summary>
     Task<MeetingDetailDto?> GetMeetingAsync(
         Guid id,
+        Guid userId,
         CancellationToken cancellationToken = default);
 }

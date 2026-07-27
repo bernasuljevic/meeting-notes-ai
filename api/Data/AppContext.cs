@@ -41,5 +41,14 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Username)
             .IsUnique();
+
+        // Kullanıcı silinirse toplantı silinmez, sadece sahipsiz (UserId = null)
+        // kalır — bir kullanıcı hesabının kaybı geçmiş toplantı kayıtlarını
+        // yok etmemeli.
+        modelBuilder.Entity<Meeting>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(m => m.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

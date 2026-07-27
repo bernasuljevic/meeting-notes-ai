@@ -130,7 +130,7 @@ export function Recorder({
   async function handleConfirmSave(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!notes && !aiSkipped) return;
+    if ((!notes && !aiSkipped) || !token) return;
 
     const startedAt = recordingStartedAtRef.current ?? new Date().toISOString();
     const endedAt = recordingEndedAtRef.current ?? new Date().toISOString();
@@ -140,13 +140,16 @@ export function Recorder({
     try {
       setIsSaving(true);
 
-      const result = await createMeeting({
-        title,
-        startedAt,
-        endedAt,
-        transcript,
-        summary: notes,
-      });
+      const result = await createMeeting(
+        {
+          title,
+          startedAt,
+          endedAt,
+          transcript,
+          summary: notes,
+        },
+        token
+      );
 
       console.log("Toplantı kaydedildi:", result.id);
 

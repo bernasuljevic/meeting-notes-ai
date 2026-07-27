@@ -200,9 +200,10 @@ app.MapGet("/api/ping", () =>
 });
 
 // --- Auth uçları ---
-// Kayıt ve transkript/toplantı listesi login gerektirmez; sadece AI özellikleri
-// (özet çıkarma, toplantıyla soru-cevap) giriş yapmayı ve AI ayarlarının
-// (sağlayıcı + model + gerekiyorsa token) tamamlanmış olmasını gerektirir.
+// Register/login açık uçlar. Diğer her şey (toplantılar dahil) artık login
+// gerektiriyor; AI özellikleri (özet çıkarma, toplantıyla soru-cevap) ayrıca
+// AI ayarlarının (sağlayıcı + model + gerekiyorsa token) tamamlanmış olmasını
+// da gerektirir.
 
 app.MapPost("/api/auth/register", async (
     RegisterRequest request,
@@ -418,43 +419,75 @@ app.MapPost("/api/summarize", async (
     }
 }).RequireAuthorization();
 
+// --- Toplantı uçları ---
+// Toplantılar artık kullanıcıya bağlı (bkz. Meeting.UserId): her uç giriş
+// gerektiriyor ve sadece isteği yapan kullanıcının KENDİ toplantılarına erişim
+// veriyor. Daha önce bu uçların hiçbiri RequireAuthorization taşımıyordu ve
+// UserId hiç filtrelenmiyordu — giriş yapmış herhangi bir kullanıcı (hatta
+// giriş yapmadan) başka kullanıcıların toplantı listesini, detayını, dışa
+// aktarımını görebiliyor, hatta toplantısını silebiliyordu.
+
 app.MapPost(
     "/api/meetings",
     async (
         CreateMeetingRequest request,
+        HttpContext httpContext,
         IMeetingService meetingService
     ) =>
 {
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
     var meeting =
-        await meetingService.CreateMeetingAsync(request);
+        await meetingService.CreateMeetingAsync(request, userId);
 
     return Results.Ok(new
     {
         meeting.Id
     });
-});
+}).RequireAuthorization();
 
 app.MapGet(
     "/api/meetings",
     async (
+        HttpContext httpContext,
         IMeetingService meetingService
     ) =>
 {
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
     var meetings =
-        await meetingService.GetMeetingsAsync();
+        await meetingService.GetMeetingsAsync(userId.Value);
 
     return Results.Ok(meetings);
-});
+}).RequireAuthorization();
 
 app.MapGet(
     "/api/meetings/{id:guid}",
     async (
         Guid id,
+        HttpContext httpContext,
         IMeetingService meetingService
     ) =>
 {
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
     var meeting =
-        await meetingService.GetMeetingAsync(id);
+        await meetingService.GetMeetingAsync(id, userId.Value);
 
     if (meeting is null)
     {
@@ -462,16 +495,24 @@ app.MapGet(
     }
 
     return Results.Ok(meeting);
-});
+}).RequireAuthorization();
 
 app.MapDelete("/api/meetings/{id:guid}", async (
     Guid id,
+    HttpContext httpContext,
     AppDbContext db) =>
 {
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
     var meeting = await db.Meetings
         .Include(m => m.TranscriptSegments)
         .Include(m => m.Notes)
-        .FirstOrDefaultAsync(m => m.Id == id);
+        .FirstOrDefaultAsync(m => m.Id == id && m.UserId == userId.Value);
 
     if (meeting is null)
     {
@@ -485,14 +526,22 @@ app.MapDelete("/api/meetings/{id:guid}", async (
     await db.SaveChangesAsync();
 
     return Results.NoContent();
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/meetings/{id:guid}/export/docx", async (
     Guid id,
+    HttpContext httpContext,
     IMeetingService meetingService,
     IMeetingExportService exportService) =>
 {
-    var meeting = await meetingService.GetMeetingAsync(id);
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var meeting = await meetingService.GetMeetingAsync(id, userId.Value);
 
     if (meeting is null)
     {
@@ -506,14 +555,22 @@ app.MapGet("/api/meetings/{id:guid}/export/docx", async (
         bytes,
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         fileName);
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/meetings/{id:guid}/export/pdf", async (
     Guid id,
+    HttpContext httpContext,
     IMeetingService meetingService,
     IMeetingExportService exportService) =>
 {
-    var meeting = await meetingService.GetMeetingAsync(id);
+    var userId = GetUserId(httpContext);
+
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var meeting = await meetingService.GetMeetingAsync(id, userId.Value);
 
     if (meeting is null)
     {
@@ -524,7 +581,7 @@ app.MapGet("/api/meetings/{id:guid}/export/pdf", async (
     var fileName = $"{SanitizeFileName(meeting.Title)}.pdf";
 
     return Results.File(bytes, "application/pdf", fileName);
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/meetings/{id:guid}/chat", async (
     Guid id,
@@ -557,7 +614,7 @@ app.MapPost("/api/meetings/{id:guid}/chat", async (
         });
     }
 
-    var meeting = await meetingService.GetMeetingAsync(id);
+    var meeting = await meetingService.GetMeetingAsync(id, userId.Value);
 
     if (meeting is null)
     {

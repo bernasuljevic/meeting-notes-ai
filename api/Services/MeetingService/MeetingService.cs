@@ -20,11 +20,13 @@ public class MeetingService : IMeetingService
 
     public async Task<api.Models.Meeting> CreateMeetingAsync(
         CreateMeetingRequest request,
+        Guid? userId,
         CancellationToken cancellationToken = default)
     {
         var meeting = new api.Models.Meeting
         {
             Id = Guid.NewGuid(),
+            UserId = userId,
             Title = request.Title,
             StartedAt = request.StartedAt,
             EndedAt = request.EndedAt
@@ -139,9 +141,11 @@ public class MeetingService : IMeetingService
     }
 
     public async Task<List<MeetingListItemDto>> GetMeetingsAsync(
+        Guid userId,
         CancellationToken cancellationToken = default)
     {
         return await _context.Meetings
+            .Where(m => m.UserId == userId)
             .OrderByDescending(m => m.CreatedAt)
             .Select(m => new MeetingListItemDto(
                 m.Id,
@@ -155,10 +159,11 @@ public class MeetingService : IMeetingService
 
     public async Task<MeetingDetailDto?> GetMeetingAsync(
         Guid id,
+        Guid userId,
         CancellationToken cancellationToken = default)
     {
         return await _context.Meetings
-            .Where(m => m.Id == id)
+            .Where(m => m.Id == id && m.UserId == userId)
             .Select(m => new MeetingDetailDto(
                 m.Id,
                 m.Title,

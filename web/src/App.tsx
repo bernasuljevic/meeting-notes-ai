@@ -18,7 +18,7 @@ import {
 const API_BASE_URL = "";
 
 function App() {
-  const { isLoading: isAuthLoading, isAuthenticated, username, hasAiConfigured, logout } =
+  const { isLoading: isAuthLoading, isAuthenticated, username, hasAiConfigured, token, logout } =
     useAuth();
 
   const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = useState(false);
@@ -55,7 +55,7 @@ function App() {
 
   useEffect(() => {
     async function loadMeeting() {
-      if (!selectedMeetingId) {
+      if (!selectedMeetingId || !token) {
         setSelectedMeeting(null);
         return;
       }
@@ -64,7 +64,8 @@ function App() {
         setLoadingMeeting(true);
 
         const meeting = await getMeeting(
-          selectedMeetingId
+          selectedMeetingId,
+          token
         );
 
         setSelectedMeeting(meeting);
@@ -76,7 +77,7 @@ function App() {
     }
 
     loadMeeting();
-  }, [selectedMeetingId]);
+  }, [selectedMeetingId, token]);
 
   // İnternet bağlantısı kesilir/geri gelirse kullanıcıyı toast ile bilgilendir.
   useEffect(() => {
@@ -226,6 +227,7 @@ function App() {
               meeting={selectedMeeting}
               onBack={handleNewMeeting}
               onOpenAiSettings={() => setAiSettingsDialogOpen(true)}
+              token={token}
             />
 
           ) : (

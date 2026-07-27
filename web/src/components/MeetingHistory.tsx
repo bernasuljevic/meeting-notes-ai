@@ -17,6 +17,7 @@ import {
   type MeetingListItem,
 } from "../lib/api";
 import { formatDuration } from "../lib/meetingStats";
+import { useAuth } from "../lib/AuthContext";
 
 import {
   AlertDialog,
@@ -188,6 +189,7 @@ export function MeetingHistory({
   onMeetingDeleted,
   onStartRecording,
 }: MeetingHistoryProps) {
+  const { token } = useAuth();
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,10 +201,16 @@ export function MeetingHistory({
 
   useEffect(() => {
     async function loadMeetings() {
+      if (!token) {
+        setMeetings([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
 
-        const result = await getMeetings();
+        const result = await getMeetings(token);
 
         setMeetings(result);
         setError(null);
@@ -218,7 +226,7 @@ export function MeetingHistory({
     }
 
     loadMeetings();
-  }, [refreshKey]);
+  }, [refreshKey, token]);
 
   function requestDelete(e: React.MouseEvent, id: string) {
     e.stopPropagation();
@@ -226,13 +234,13 @@ export function MeetingHistory({
   }
 
   async function confirmDelete() {
-    if (!pendingDeleteId) return;
+    if (!pendingDeleteId || !token) return;
 
     const id = pendingDeleteId;
 
     try {
       setDeletingId(id);
-      await deleteMeeting(id);
+      await deleteMeeting(id, token);
       onMeetingDeleted(id);
       toast.success("Toplantı silindi.");
     } catch (err) {

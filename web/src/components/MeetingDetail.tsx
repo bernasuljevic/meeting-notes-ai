@@ -32,6 +32,8 @@ interface MeetingDetailProps {
   // dialogları açabilmesi için App.tsx'ten geçiriliyor.
   onOpenLogin?: () => void;
   onOpenAiSettings?: () => void;
+  // Dışa aktarma (Word/PDF) uçları artık giriş gerektiriyor — App.tsx'ten geçirilir.
+  token?: string | null;
 }
 
 export function MeetingDetail({
@@ -39,15 +41,16 @@ export function MeetingDetail({
   onBack,
   onOpenLogin,
   onOpenAiSettings,
+  token,
 }: MeetingDetailProps) {
   const [downloadingFormat, setDownloadingFormat] = useState<"docx" | "pdf" | null>(null);
 
   async function handleDownload(format: "docx" | "pdf") {
-    if (!meeting) return;
+    if (!meeting || !token) return;
 
     try {
       setDownloadingFormat(format);
-      await downloadMeetingExport(meeting.id, format, meeting.title);
+      await downloadMeetingExport(meeting.id, format, meeting.title, token);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Dosya indirilemedi.");
     } finally {

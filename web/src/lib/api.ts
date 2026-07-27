@@ -109,8 +109,12 @@ export interface MeetingListItem {
   createdAt: string;
 }
 
-export async function getMeetings(): Promise<MeetingListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/api/meetings`);
+export async function getMeetings(token: string): Promise<MeetingListItem[]> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
   if (!response.ok) {
     throw new Error("Toplantılar alınamadı.");
@@ -142,9 +146,12 @@ export interface MeetingDetail {
   notes: MeetingNote[];
 }
 
-export async function deleteMeeting(id: string) {
+export async function deleteMeeting(id: string, token: string) {
   const response = await fetch(`${API_BASE_URL}/api/meetings/${id}`, {
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {
@@ -152,8 +159,12 @@ export async function deleteMeeting(id: string) {
   }
 }
 
-export async function getMeeting(id: string): Promise<MeetingDetail> {
-  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}`);
+export async function getMeeting(id: string, token: string): Promise<MeetingDetail> {
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
   if (!response.ok) {
     throw new Error("Toplantı bulunamadı.");
@@ -169,9 +180,14 @@ export async function getMeeting(id: string): Promise<MeetingDetail> {
 export async function downloadMeetingExport(
   id: string,
   format: "docx" | "pdf",
-  fileName: string
+  fileName: string,
+  token: string
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}/export/${format}`);
+  const response = await fetch(`${API_BASE_URL}/api/meetings/${id}/export/${format}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
   if (!response.ok) {
     throw new Error(
@@ -237,11 +253,15 @@ export interface CreateMeetingResponse {
   id: string;
 }
 
-export async function createMeeting(request: CreateMeetingRequest): Promise<CreateMeetingResponse> {
+export async function createMeeting(
+  request: CreateMeetingRequest,
+  token: string
+): Promise<CreateMeetingResponse> {
   const response = await fetch(`${API_BASE_URL}/api/meetings`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(request),
   });
