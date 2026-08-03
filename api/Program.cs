@@ -4,6 +4,7 @@ using api.Data;
 using Microsoft.EntityFrameworkCore;
 using api.Services;
 using api.Services.Auth;
+using api.Services.Email;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -128,6 +129,10 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserAiClient, UserAiClient>();
 
+// SendGrid API key hazır olunca burası SendGridEmailSender'a çevrilecek -
+// UserService (ve onu çağıran hiçbir kod) değişmeyecek, sadece bu DI kaydı.
+builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
+
 var jwtSecret = builder.Configuration["Jwt:Secret"];
 
 if (string.IsNullOrWhiteSpace(jwtSecret))
@@ -207,19 +212,21 @@ app.MapGet("/api/ping", () =>
 
 app.MapPost("/api/auth/register", async (
     RegisterRequest request,
-    IUserService userService,
-    IJwtTokenService jwtTokenService) =>
+    IUserService userService) =>
 {
-    var (success, error, user) = await userService.RegisterAsync(request.Username, request.Password);
+    var (success, error, user) = await userService.RegisterAsync(
+        request.Username, request.Email, request.Password);
 
     if (!success || user is null)
     {
         return Results.BadRequest(new { error });
     }
 
-    var token = jwtTokenService.GenerateToken(user);
-
-    return Results.Ok(new AuthResponse(token, user.Username));
+    // Artık burada JWT üretilmiyor - hesap doğrulanana kadar giriş yapılamıyor
+    // (bkz. login uçundaki IsEmailVerified kontrolü). Frontend bu yanıttaki
+    // email'i kullanıp kullanıcıyı kod girme ekranına yönlendiriyor.
+    return Results.Ok(new RegisterResponse(
+        "Kayıt alındı. E-postanıza gönderilen doğrulama kodunu girin.", user.Email));
 });
 
 app.MapPost("/api/auth/login", async (
@@ -234,9 +241,49 @@ app.MapPost("/api/auth/login", async (
         return Results.Json(new { error = "Kullanıcı adı ya da şifre hatalı." }, statusCode: 401);
     }
 
+    if (!user.IsEmailVerified)
+    {
+        return Results.Json(
+            new { error = "E-posta adresiniz henüz doğrulanmadı.", email = user.Email, requiresVerification = true },
+            statusCode: 403);
+    }
+
     var token = jwtTokenService.GenerateToken(user);
 
     return Results.Ok(new AuthResponse(token, user.Username));
+});
+
+app.MapPost("/api/auth/verify-email", async (
+    VerifyEmailRequest request,
+    IUserService userService,
+    IJwtTokenService jwtTokenService) =>
+{
+    var (success, error, user) = await userService.VerifyEmailAsync(request.Email, request.Code);
+
+    if (!success || user is null)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    // Doğrulama başarılıysa otomatik giriş yaptırıyoruz - kullanıcı kodu
+    // girdikten sonra ayrıca "giriş yap" ekranına gitmesin diye.
+    var token = jwtTokenService.GenerateToken(user);
+
+    return Results.Ok(new AuthResponse(token, user.Username));
+});
+
+app.MapPost("/api/auth/resend-code", async (
+    ResendCodeRequest request,
+    IUserService userService) =>
+{
+    var (success, error) = await userService.ResendVerificationCodeAsync(request.Email);
+
+    if (!success)
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Ok(new { message = "Yeni bir doğrulama kodu gönderildi." });
 });
 
 app.MapGet("/api/auth/me", async (
@@ -681,9 +728,15 @@ public class SummarizeResponse
     public List<string> KeyDiscussionPoints { get; set; } = new();
 }
 
-public record RegisterRequest(string Username, string Password);
+public record RegisterRequest(string Username, string Email, string Password);
 
 public record LoginRequest(string Username, string Password);
+
+public record VerifyEmailRequest(string Email, string Code);
+
+public record ResendCodeRequest(string Email);
+
+public record RegisterResponse(string Message, string Email);
 
 public record AuthResponse(string Token, string Username);
 

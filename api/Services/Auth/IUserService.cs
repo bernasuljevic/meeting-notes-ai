@@ -5,10 +5,25 @@ namespace api.Services.Auth;
 public interface IUserService
 {
     Task<(bool Success, string? Error, User? User)> RegisterAsync(
-        string username, string password, CancellationToken cancellationToken = default);
+        string username, string email, string password, CancellationToken cancellationToken = default);
 
     Task<User?> AuthenticateAsync(
         string username, string password, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kayıt sırasında e-postaya gönderilen kodu doğrular; başarılıysa hesabı
+    /// IsEmailVerified=true yapar ve User'ı döner (endpoint bunun üzerine JWT
+    /// üretip otomatik giriş yaptırır).
+    /// </summary>
+    Task<(bool Success, string? Error, User? User)> VerifyEmailAsync(
+        string email, string code, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Yeni bir doğrulama kodu üretip gönderir - eskisini geçersiz kılar.
+    /// 60 saniyelik bir cooldown var (art arda istek/spam'e karşı).
+    /// </summary>
+    Task<(bool Success, string? Error)> ResendVerificationCodeAsync(
+        string email, CancellationToken cancellationToken = default);
 
     Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 

@@ -13,6 +13,8 @@ import {
   getMe,
   loginUser,
   registerUser,
+  resendVerificationCode,
+  verifyEmail as verifyEmailRequest,
   updateAiSettings as updateAiSettingsRequest,
   type MeResponse,
 } from "./api";
@@ -28,7 +30,11 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  // Artık otomatik giriş yapmıyor - dönen email, kod girme ekranına
+  // geçiş için kullanılıyor (bkz. AuthGate).
+  register: (username: string, email: string, password: string) => Promise<string>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
+  resendCode: (email: string) => Promise<void>;
   logout: () => void;
   updateAiSettings: (
     provider: string,
@@ -92,10 +98,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(result.token);
   }, []);
 
-  const register = useCallback(async (username: string, password: string) => {
-    const result = await registerUser(username, password);
+  const register = useCallback(
+    async (username: string, email: string, password: string) => {
+      const result = await registerUser(username, email, password);
+      return result.email;
+    },
+    []
+  );
+
+  const verifyEmail = useCallback(async (email: string, code: string) => {
+    const result = await verifyEmailRequest(email, code);
     localStorage.setItem(TOKEN_STORAGE_KEY, result.token);
     setToken(result.token);
+  }, []);
+
+  const resendCode = useCallback(async (email: string) => {
+    await resendVerificationCode(email);
   }, []);
 
   const logout = useCallback(() => {
@@ -130,10 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: token !== null && me !== null,
       login,
       register,
+      verifyEmail,
+      resendCode,
       logout,
       updateAiSettings,
     }),
-    [token, me, isLoading, login, register, logout, updateAiSettings]
+    [token, me, isLoading, login, register, verifyEmail, resendCode, logout, updateAiSettings]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

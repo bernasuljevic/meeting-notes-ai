@@ -337,6 +337,11 @@ export interface AuthResponse {
   username: string;
 }
 
+export interface RegisterResponse {
+  message: string;
+  email: string;
+}
+
 export interface MeResponse {
   username: string;
   hasAiConfigured: boolean;
@@ -344,16 +349,34 @@ export interface MeResponse {
   aiModel: string | null;
 }
 
+/**
+ * login() 403 (e-posta doğrulanmamış) döndüğünde fırlatılır - AuthGate bunu
+ * yakalayıp kullanıcıyı doğrudan kod girme ekranına yönlendiriyor, generic
+ * "kullanıcı adı/şifre hatalı" mesajıyla karıştırmıyor.
+ */
+export class EmailNotVerifiedError extends Error {
+  email: string;
+
+  constructor(message: string, email: string) {
+    super(message);
+    this.name = "EmailNotVerifiedError";
+    this.email = email;
+  }
+}
+
+// Artık token dönmüyor - hesap e-posta doğrulanana kadar giriş yapılamıyor
+// (bkz. verifyEmail). Dönen email, kod girme ekranına geçişte kullanılıyor.
 export async function registerUser(
   username: string,
+  email: string,
   password: string
-): Promise<AuthResponse> {
+): Promise<RegisterResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, email, password }),
   });
 
   if (!response.ok) {
@@ -376,9 +399,54 @@ export async function loginUser(
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      const body = await response.json().catch(() => null);
+
+      if (body?.requiresVerification && body?.email) {
+        throw new EmailNotVerifiedError(body.error, body.email);
+      }
+    }
+
     throw new Error(
       await parseErrorDetail(response, "Kullanıcı adı ya da şifre hatalı.")
     );
+  }
+
+  return response.json();
+}
+
+export async function verifyEmail(
+  email: string,
+  code: string
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, code }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, "Kod doğrulanamadı."));
+  }
+
+  return response.json();
+}
+
+export async function resendVerificationCode(
+  email: string
+): Promise<{ message: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/resend-code`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, "Kod gönderilemedi."));
   }
 
   return response.json();
