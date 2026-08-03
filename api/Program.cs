@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using api.Services;
 using api.Services.Auth;
 using api.Services.Email;
+using SendGrid;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -129,9 +130,24 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserAiClient, UserAiClient>();
 
-// SendGrid API key hazır olunca burası SendGridEmailSender'a çevrilecek -
-// UserService (ve onu çağıran hiçbir kod) değişmeyecek, sadece bu DI kaydı.
-builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
+// SendGrid:ApiKey doluysa gerçek e-posta gönderimine (SendGridEmailSender)
+// geçiliyor, boşsa FakeEmailSender'a (konsol log) düşülüyor - UserService (ve
+// onu çağıran hiçbir kod) hangisinin aktif olduğunu bilmiyor, key eklenince/
+// kaldırılınca kod DEĞİŞTİRMEYE gerek kalmıyor.
+builder.Services.Configure<SendGridOptions>(
+    builder.Configuration.GetSection(SendGridOptions.SectionName));
+
+var sendGridApiKey = builder.Configuration["SendGrid:ApiKey"];
+
+if (!string.IsNullOrWhiteSpace(sendGridApiKey))
+{
+    builder.Services.AddSingleton<ISendGridClient>(_ => new SendGridClient(sendGridApiKey));
+    builder.Services.AddSingleton<IEmailSender, SendGridEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, FakeEmailSender>();
+}
 
 var jwtSecret = builder.Configuration["Jwt:Secret"];
 
