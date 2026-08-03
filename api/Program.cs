@@ -130,16 +130,29 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserAiClient, UserAiClient>();
 
-// SendGrid:ApiKey doluysa gerçek e-posta gönderimine (SendGridEmailSender)
-// geçiliyor, boşsa FakeEmailSender'a (konsol log) düşülüyor - UserService (ve
-// onu çağıran hiçbir kod) hangisinin aktif olduğunu bilmiyor, key eklenince/
-// kaldırılınca kod DEĞİŞTİRMEYE gerek kalmıyor.
+// Üç olası IEmailSender - hangisinin aktif olacağı sadece hangi config
+// değerlerinin dolu olduğuna göre belirleniyor, UserService (ve onu çağıran
+// hiçbir kod) hangisinin seçildiğini bilmiyor:
+//   1) GmailSmtp doluysa - ÖNCELİKLİ. SendGrid'in gmail.com'u "taklit etmesi"
+//      spam'e düşüyordu (bkz. SendGridEmailSender yorumu); Gmail'in KENDİ
+//      SMTP'sinden göndermek bunu kökten çözüyor.
+//   2) yoksa SendGrid:ApiKey doluysa - gerçek bir alan adı + Domain
+//      Authentication kurulunca buraya geri dönülebilir.
+//   3) ikisi de yoksa FakeEmailSender (konsola log).
+builder.Services.Configure<GmailSmtpOptions>(
+    builder.Configuration.GetSection(GmailSmtpOptions.SectionName));
 builder.Services.Configure<SendGridOptions>(
     builder.Configuration.GetSection(SendGridOptions.SectionName));
 
+var gmailEmail = builder.Configuration["GmailSmtp:Email"];
+var gmailAppPassword = builder.Configuration["GmailSmtp:AppPassword"];
 var sendGridApiKey = builder.Configuration["SendGrid:ApiKey"];
 
-if (!string.IsNullOrWhiteSpace(sendGridApiKey))
+if (!string.IsNullOrWhiteSpace(gmailEmail) && !string.IsNullOrWhiteSpace(gmailAppPassword))
+{
+    builder.Services.AddSingleton<IEmailSender, GmailSmtpEmailSender>();
+}
+else if (!string.IsNullOrWhiteSpace(sendGridApiKey))
 {
     builder.Services.AddSingleton<ISendGridClient>(_ => new SendGridClient(sendGridApiKey));
     builder.Services.AddSingleton<IEmailSender, SendGridEmailSender>();
