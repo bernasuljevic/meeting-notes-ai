@@ -62,12 +62,12 @@ export function MeetingDetail({
     return (
       <Card>
         <CardContent className="flex items-center gap-4 py-10">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100">
-            <FileText className="h-7 w-7 text-blue-700" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100">
+            <FileText className="h-7 w-7 text-amber-800" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Toplantı Detayı</h2>
-            <p className="text-slate-500">Soldaki listeden bir toplantı seçin.</p>
+            <h2 className="text-2xl font-bold text-stone-900">Toplantı Detayı</h2>
+            <p className="text-stone-500">Soldaki listeden bir toplantı seçin.</p>
           </div>
         </CardContent>
       </Card>
@@ -77,7 +77,7 @@ export function MeetingDetail({
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b bg-gradient-to-r from-slate-900 to-blue-900 py-8">
+        <CardHeader className="border-b bg-gradient-to-r from-stone-900 to-amber-900 py-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
@@ -85,7 +85,7 @@ export function MeetingDetail({
               </div>
               <div>
                 <CardTitle className="text-3xl text-white">{meeting.title}</CardTitle>
-                <CardDescription className="mt-1 text-slate-300">
+                <CardDescription className="mt-1 text-stone-300">
                   Toplantı bilgileri
                 </CardDescription>
               </div>
@@ -139,21 +139,21 @@ export function MeetingDetail({
         </CardHeader>
 
         <CardContent className="grid gap-4 py-6 md:grid-cols-2">
-          <div className="rounded-2xl border bg-slate-50 p-5">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="rounded-2xl border bg-stone-50 p-5">
+            <div className="flex items-center gap-2 text-sm text-stone-500">
               <CalendarDays className="h-4 w-4" />
               Başlangıç
             </div>
-            <p className="mt-3 font-medium text-slate-800">
+            <p className="mt-3 font-medium text-stone-800">
               {new Date(meeting.startedAt).toLocaleString("tr-TR")}
             </p>
           </div>
-          <div className="rounded-2xl border bg-slate-50 p-5">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="rounded-2xl border bg-stone-50 p-5">
+            <div className="flex items-center gap-2 text-sm text-stone-500">
               <Clock3 className="h-4 w-4" />
               Bitiş
             </div>
-            <p className="mt-3 font-medium text-slate-800">
+            <p className="mt-3 font-medium text-stone-800">
               {meeting.endedAt
                 ? new Date(meeting.endedAt).toLocaleString("tr-TR")
                 : "Belirtilmedi"}
@@ -165,7 +165,7 @@ export function MeetingDetail({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <FileText className="h-6 w-6 text-blue-600" />
+            <FileText className="h-6 w-6 text-amber-600" />
             <div>
               <CardTitle>Konuşma Metni</CardTitle>
               <CardDescription>Whisper tarafından oluşturuldu.</CardDescription>
@@ -174,11 +174,11 @@ export function MeetingDetail({
         </CardHeader>
         <CardContent>
           {meeting.transcriptSegments.length ? (
-            <ScrollArea className="h-96 rounded-2xl border bg-slate-50">
+            <ScrollArea className="h-96 rounded-2xl border bg-stone-50">
               <div className="space-y-4 p-4">
                 {meeting.transcriptSegments.map((segment) => (
                   <div key={segment.id} className="rounded-2xl border bg-white p-5">
-                    <p className="whitespace-pre-wrap leading-7 text-slate-700">
+                    <p className="whitespace-pre-wrap leading-7 text-stone-700">
                       {segment.text}
                     </p>
                   </div>
@@ -186,7 +186,7 @@ export function MeetingDetail({
               </div>
             </ScrollArea>
           ) : (
-            <div className="rounded-2xl border border-dashed p-8 text-center text-slate-500">
+            <div className="rounded-2xl border border-dashed p-8 text-center text-stone-500">
               <NotebookPen className="mx-auto mb-3 h-8 w-8" />
               Konuşma metni bulunamadı.
             </div>
@@ -208,7 +208,7 @@ export function MeetingDetail({
           {meeting.notes.length ? (
             <div className="space-y-5">
               {meeting.notes.map((note) => (
-                <div key={note.id} className="rounded-2xl border bg-slate-50 p-6">
+                <div key={note.id} className="rounded-2xl border bg-stone-50 p-6">
                   <article className="prose prose-slate max-w-none">
                     <ReactMarkdown>{note.markdownContent}</ReactMarkdown>
                   </article>
@@ -216,7 +216,7 @@ export function MeetingDetail({
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed p-8 text-center text-slate-500">
+            <div className="rounded-2xl border border-dashed p-8 text-center text-stone-500">
               <Sparkles className="mx-auto mb-3 h-8 w-8" />
               Henüz yapay zekâ özeti oluşturulmamış.
             </div>

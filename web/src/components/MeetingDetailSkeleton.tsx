@@ -6,7 +6,7 @@ export function MeetingDetailSkeleton() {
   return (
     <div className="space-y-5">
       <Card className="overflow-hidden py-0 shadow-sm">
-        <CardHeader className="border-b bg-gradient-to-r from-slate-900 to-blue-900 py-4">
+        <CardHeader className="border-b bg-gradient-to-r from-stone-900 to-amber-900 py-4">
           <div className="flex items-center gap-3">
             <Skeleton className="h-10 w-10 shrink-0 rounded-xl bg-white/10" />
             <div className="space-y-2">
@@ -15,7 +15,7 @@ export function MeetingDetailSkeleton() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex gap-2 bg-slate-50/60 py-3 dark:bg-slate-800/40">
+        <CardContent className="flex gap-2 bg-stone-50/60 py-3 dark:bg-stone-800/40">
           <Skeleton className="h-7 w-40 rounded-full" />
           <Skeleton className="h-7 w-40 rounded-full" />
         </CardContent>

@@ -110,8 +110,8 @@ function App() {
   // (sayfa her yenilendiğinde bir anlık) hiçbir ekranı yanlışlıkla gösterme.
   if (isAuthLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
       </div>
     );
   }
@@ -123,21 +123,23 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
+    <div className="min-h-screen bg-[var(--page-bg)]">
 
       {/* HEADER */}
 
-      <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
+      <header className="border-b border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900 print:hidden">
 
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5">
 
           <div>
 
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
-              Toplantı Notları AI
+            <h1 className="flex items-center gap-2.5 text-3xl font-bold">
+              <img src="/favicon.svg" alt="" className="h-10 w-10 rounded-xl shadow-sm" />
+              <span className="text-stone-900 dark:text-stone-50">Meet</span>
+              <span className="-ml-2.5 text-primary">Brainz</span>
             </h1>
 
-            <p className="mt-1 text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-stone-500 dark:text-stone-400">
               Yapay zekâ destekli toplantı asistanı
             </p>
 
@@ -152,7 +154,7 @@ function App() {
             {/* Bu blok her zaman giriş yapılmışken render edilir (App.tsx'in
                 üstünde !isAuthenticated ise zaten AuthGate döndürülüyor). */}
             <div className="flex items-center gap-2">
-              <span className="hidden text-sm text-slate-600 sm:inline dark:text-slate-300">
+              <span className="hidden text-sm text-stone-600 sm:inline dark:text-stone-300">
                 Merhaba, {username}
               </span>
 
@@ -249,7 +251,7 @@ function App() {
 
         <button
           onClick={handleNewMeeting}
-          className="fixed bottom-6 right-6 rounded-full bg-blue-600 px-5 py-3 text-white shadow-lg transition hover:bg-blue-700 print:hidden"
+          className="fixed bottom-6 right-6 rounded-full bg-amber-600 px-5 py-3 text-white shadow-lg transition hover:bg-amber-800 print:hidden"
         >
           + Yeni Toplantı
         </button>

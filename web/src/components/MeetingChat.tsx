@@ -67,7 +67,7 @@ export function MeetingChat({
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
-          <MessageCircle className="h-6 w-6 text-blue-600" />
+          <MessageCircle className="h-6 w-6 text-amber-600" />
           <div>
             <CardTitle>Yapay Zekâ Sohbet</CardTitle>
             <CardDescription>
@@ -79,21 +79,21 @@ export function MeetingChat({
 
       <CardContent className="space-y-4">
         {history.length > 0 && (
-          <ScrollArea className="h-72 rounded-2xl border bg-slate-50 dark:bg-slate-800/60">
+          <ScrollArea className="h-72 rounded-2xl border bg-stone-50 dark:bg-stone-800/60">
             <div className="space-y-4 p-4">
               {history.map((qa, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-blue-600 px-4 py-2 text-sm text-white">
+                  <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-amber-600 px-4 py-2 text-sm text-white">
                     {qa.question}
                   </div>
-                  <div className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm border bg-white px-4 py-2 text-sm whitespace-pre-wrap text-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                  <div className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm border bg-white px-4 py-2 text-sm whitespace-pre-wrap text-stone-700 dark:bg-stone-900 dark:text-stone-300">
                     {qa.answer}
                   </div>
                 </div>
               ))}
 
               {isAsking && (
-                <div className="mr-auto flex max-w-[85%] items-center gap-2 rounded-2xl rounded-bl-sm border bg-white px-4 py-2 text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                <div className="mr-auto flex max-w-[85%] items-center gap-2 rounded-2xl rounded-bl-sm border bg-white px-4 py-2 text-sm text-stone-500 dark:bg-stone-900 dark:text-stone-400">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Yanıt hazırlanıyor...
                 </div>
@@ -115,7 +115,7 @@ export function MeetingChat({
               }}
               placeholder="Örn: Bu toplantıda bütçe konuşuldu mu?"
               disabled={isAsking}
-              className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="flex-1 rounded-xl border border-stone-200 px-4 py-2 text-sm outline-none focus:border-amber-500 disabled:opacity-60 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
             />
             <Button
               type="button"
@@ -132,7 +132,7 @@ export function MeetingChat({
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-blue-700 sm:flex-row sm:items-center sm:justify-between dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+          <div className="flex flex-col gap-3 rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between dark:border-amber-600/20 dark:bg-amber-600/10 dark:text-amber-300">
             <div className="flex items-start gap-3">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
               <p>

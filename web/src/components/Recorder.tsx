@@ -170,23 +170,34 @@ export function Recorder({
     <div className="space-y-8">
       {/* Kayıt Kartı */}
       <Card className="overflow-hidden py-0 shadow-sm transition-shadow hover:shadow-md">
-        {/* Gradient başlık alanı */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-slate-900 px-6 py-8 sm:px-10 sm:py-10">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-16 left-1/3 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+        {/* Başlık alanı - kullanıcının verdiği referans görseldeki gradyan/mikrofon illüstrasyonu birebir kırpılıp kullanıldı (public/illustrations) */}
+        <div className="relative overflow-hidden bg-gradient-to-b from-[#fff2d3] to-white px-6 py-8 dark:from-[#111a27] dark:to-[#111a27] sm:px-10 sm:py-10">
+          {/* Referans görselden kırpılan mikrofon + ses dalgası illüstrasyonu - kenarları saydamlığa doğru yumuşatıldı ki kart gradyanıyla dikişsiz birleşsin */}
+          <img
+            src="/illustrations/recorder-mic-light.png"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-auto object-contain sm:block dark:hidden"
+          />
+          <img
+            src="/illustrations/recorder-mic-dark.png"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-auto object-contain sm:dark:block"
+          />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-                  <Mic className="h-5 w-5 text-white" />
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent shadow-sm">
+                  <Mic className="h-5 w-5 text-primary" />
                 </span>
-                <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                <h2 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-50 sm:text-3xl">
                   Ses Kaydı
                 </h2>
               </div>
 
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-blue-50/90">
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-600 dark:text-stone-400">
                 Kaydı başlatın, transkript canlı olarak oluşsun; kaydı
                 bitirdiğinizde yapay zekâ özetlesin, sonra önerilen ismi
                 değiştirip kaydedin.
@@ -196,7 +207,7 @@ export function Recorder({
             {/* Canlı durum göstergesi */}
             <Badge
               variant={isRecording ? "destructive" : "secondary"}
-              className="gap-2 rounded-full px-4 py-2 text-sm font-medium backdrop-blur-sm"
+              className="gap-2 rounded-full px-4 py-2 text-sm font-medium shadow-sm"
             >
               <Circle
                 className={`h-2.5 w-2.5 fill-current ${
@@ -211,7 +222,7 @@ export function Recorder({
         {/* Kontroller */}
         <CardContent className="space-y-6 px-6 py-8 sm:px-10">
           {/* KVKK / gizlilik bilgilendirmesi */}
-          <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-700">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-xs leading-relaxed text-amber-800">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
               Bu toplantı kaydedilmektedir. Katılımcıları bilgilendirin ve
@@ -242,7 +253,7 @@ export function Recorder({
             </Button>
 
             {/* Süre göstergesi */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-600">
+            <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 font-mono text-sm text-stone-600">
               <Clock3 className="h-4 w-4" />
               {formatDuration(durationSec)}
             </div>
@@ -251,12 +262,12 @@ export function Recorder({
           <Separator />
 
           {/* Ses seviyesi kartı */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
+          <div className="rounded-2xl border border-stone-100 bg-stone-50/70 p-5">
             <LevelMeter level={level} isRecording={isRecording} />
           </div>
 
           {isFinalizing && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+            <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
               <p>Son parçalar işleniyor ve yapay zekâ özeti oluşturuluyor...</p>
             </div>
@@ -304,9 +315,9 @@ export function Recorder({
           {readyToName && !justSaved && (
             <form
               onSubmit={handleConfirmSave}
-              className="space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
+              className="space-y-3 rounded-xl border border-amber-100 bg-amber-50 p-4"
             >
-              <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
                 <Sparkles className="h-4 w-4" />
                 Toplantıya bir isim ver (öneriyi değiştirebilirsin)
               </div>
@@ -317,7 +328,7 @@ export function Recorder({
                   onChange={(e) => setTitleDraft(e.target.value)}
                   disabled={isSaving}
                   placeholder="Toplantı adı"
-                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60"
+                  className="flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500 disabled:opacity-60"
                 />
                 <Button
                   type="submit"

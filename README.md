@@ -1,4 +1,4 @@
-# Toplantı Notları (meeting-notes-ai)
+# MeetBrainz (eski adıyla Toplantı Notları / meeting-notes-ai)
 
 Toplantı seslerini kaydedip gerçek zamanlı Türkçe transkript çıkaran, konuşma bitince yapay zekâ ile yapılandırılmış toplantı notları üreten ve tüm geçmişi kalıcı olarak saklayan bir uygulama.
 

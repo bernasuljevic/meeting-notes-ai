@@ -21,7 +21,7 @@ interface AiSettingsDialogProps {
 }
 
 const inputClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+  "w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500 disabled:opacity-60 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100";
 
 export function AiSettingsDialog({ open, onOpenChange }: AiSettingsDialogProps) {
   const { aiProvider, aiModel, updateAiSettings } = useAuth();
@@ -68,7 +68,7 @@ export function AiSettingsDialog({ open, onOpenChange }: AiSettingsDialogProps) 
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-600" />
+            <Sparkles className="h-5 w-5 text-amber-600" />
             AI Ayarları
           </DialogTitle>
           <DialogDescription>
@@ -81,7 +81,7 @@ export function AiSettingsDialog({ open, onOpenChange }: AiSettingsDialogProps) 
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
               AI sağlayıcı
             </label>
             <input
@@ -94,7 +94,7 @@ export function AiSettingsDialog({ open, onOpenChange }: AiSettingsDialogProps) 
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
               Model
             </label>
             <input
@@ -107,9 +107,9 @@ export function AiSettingsDialog({ open, onOpenChange }: AiSettingsDialogProps) 
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
               API Token{" "}
-              <span className="font-normal text-slate-400">
+              <span className="font-normal text-stone-400">
                 (opsiyonel — boş bırakırsan mevcut token değişmez)
               </span>
             </label>

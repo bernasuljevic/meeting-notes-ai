@@ -25,7 +25,7 @@ interface NotesPanelProps {
 
 function EmptySection({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+    <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-stone-500 dark:border-stone-700 dark:text-stone-400">
       {text}
     </div>
   );
@@ -80,26 +80,26 @@ export function NotesPanel({
     <div className="space-y-6">
       {/* Genel Özet */}
       <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b bg-gradient-to-r from-slate-900 to-blue-900 py-5 text-white">
+        <CardHeader className="border-b bg-gradient-to-r from-stone-900 to-amber-900 py-5 text-white">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
               <CardTitle className="text-white">Yapay Zekâ Özeti</CardTitle>
-              <CardDescription className="text-slate-300">
+              <CardDescription className="text-stone-300">
                 Toplantının otomatik analizi
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="py-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-800/60">
-            <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 dark:border-stone-700 dark:bg-stone-800/60">
+            <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-stone-800 dark:text-stone-100">
               <Sparkles className="h-5 w-5 text-amber-500" />
               Genel Özet
             </h3>
-            <p className="whitespace-pre-wrap leading-8 text-slate-700 dark:text-slate-300">
+            <p className="whitespace-pre-wrap leading-8 text-stone-700 dark:text-stone-300">
               {summary.generalSummary}
             </p>
           </div>
@@ -120,10 +120,10 @@ export function NotesPanel({
               {summary.decisions.map((decision, index) => (
                 <li
                   key={index}
-                  className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
+                  className="flex gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-700 dark:bg-stone-800/60"
                 >
                   <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-600" />
-                  <span className="text-slate-700 dark:text-slate-300">{decision}</span>
+                  <span className="text-stone-700 dark:text-stone-300">{decision}</span>
                 </li>
               ))}
             </ul>
@@ -137,7 +137,7 @@ export function NotesPanel({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <ClipboardCheck className="h-5 w-5 text-blue-600" />
+            <ClipboardCheck className="h-5 w-5 text-amber-600" />
             Yapılacaklar
           </CardTitle>
         </CardHeader>
@@ -147,10 +147,10 @@ export function NotesPanel({
               {summary.actionItems.map((item, index) => (
                 <li
                   key={index}
-                  className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
+                  className="flex gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-700 dark:bg-stone-800/60"
                 >
-                  <ClipboardCheck className="mt-1 h-5 w-5 shrink-0 text-blue-600" />
-                  <span className="text-slate-700 dark:text-slate-300">{item}</span>
+                  <ClipboardCheck className="mt-1 h-5 w-5 shrink-0 text-amber-600" />
+                  <span className="text-stone-700 dark:text-stone-300">{item}</span>
                 </li>
               ))}
             </ul>
@@ -174,10 +174,10 @@ export function NotesPanel({
               {summary.openIssuesAndRisks.map((issue, index) => (
                 <li
                   key={index}
-                  className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
+                  className="flex gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-700 dark:bg-stone-800/60"
                 >
                   <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-600" />
-                  <span className="text-slate-700 dark:text-slate-300">{issue}</span>
+                  <span className="text-stone-700 dark:text-stone-300">{issue}</span>
                 </li>
               ))}
             </ul>
@@ -191,7 +191,7 @@ export function NotesPanel({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <MessageSquare className="h-5 w-5 text-blue-600" />
+            <MessageSquare className="h-5 w-5 text-amber-600" />
             Önemli Tartışma Noktaları
           </CardTitle>
         </CardHeader>
@@ -201,10 +201,10 @@ export function NotesPanel({
               {summary.keyDiscussionPoints.map((point, index) => (
                 <li
                   key={index}
-                  className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60"
+                  className="flex gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-700 dark:bg-stone-800/60"
                 >
-                  <MessageSquare className="mt-1 h-5 w-5 shrink-0 text-blue-600" />
-                  <span className="text-slate-700 dark:text-slate-300">{point}</span>
+                  <MessageSquare className="mt-1 h-5 w-5 shrink-0 text-amber-600" />
+                  <span className="text-stone-700 dark:text-stone-300">{point}</span>
                 </li>
               ))}
             </ul>

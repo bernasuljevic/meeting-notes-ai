@@ -21,7 +21,7 @@ interface LoginDialogProps {
 }
 
 const inputClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+  "w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500 disabled:opacity-60 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100";
 
 export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   const { login, register } = useAuth();
@@ -112,7 +112,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
           <TabsContent value="login">
             <form onSubmit={handleLoginSubmit} className="space-y-3 pt-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                   Kullanıcı adı
                 </label>
                 <input
@@ -126,7 +126,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                   Şifre
                 </label>
                 <input
@@ -166,7 +166,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
           <TabsContent value="register">
             <form onSubmit={handleRegisterSubmit} className="space-y-3 pt-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                   Kullanıcı adı
                 </label>
                 <input
@@ -180,7 +180,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                   Şifre
                 </label>
                 <input

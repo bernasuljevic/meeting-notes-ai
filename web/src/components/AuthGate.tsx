@@ -3,7 +3,7 @@
 // görünmesin diye App.tsx bu bileşeni, kullanıcı giriş yapana kadar TEK BAŞINA
 // render ediyor. Giriş yapılınca App.tsx normal uygulamaya geçiyor.
 import { useState } from "react";
-import { Loader2, LogIn, Mic, UserPlus } from "lucide-react";
+import { Loader2, LogIn, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "../lib/AuthContext";
@@ -19,7 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const inputClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+  "w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500 disabled:opacity-60 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100";
 
 export function AuthGate() {
   const { login, register } = useAuth();
@@ -67,13 +67,14 @@ export function AuthGate() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6 dark:bg-slate-950">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600">
-            <Mic className="h-7 w-7 text-white" />
-          </div>
-          <CardTitle className="text-2xl">Toplantı Notları AI</CardTitle>
+          <img src="/favicon.svg" alt="" className="mx-auto mb-2 h-14 w-14 rounded-2xl shadow-sm" />
+          <CardTitle className="text-2xl font-bold">
+            <span className="text-stone-900 dark:text-stone-50">Meet</span>
+            <span className="text-primary">Brainz</span>
+          </CardTitle>
           <CardDescription>
             Devam etmek için giriş yap ya da yeni bir hesap oluştur.
           </CardDescription>
@@ -89,7 +90,7 @@ export function AuthGate() {
             <TabsContent value="login">
               <form onSubmit={handleLoginSubmit} className="space-y-3 pt-2">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                     Kullanıcı adı
                   </label>
                   <input
@@ -103,7 +104,7 @@ export function AuthGate() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                     Şifre
                   </label>
                   <input
@@ -143,7 +144,7 @@ export function AuthGate() {
             <TabsContent value="register">
               <form onSubmit={handleRegisterSubmit} className="space-y-3 pt-2">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                     Kullanıcı adı
                   </label>
                   <input
@@ -157,7 +158,7 @@ export function AuthGate() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
                     Şifre
                   </label>
                   <input

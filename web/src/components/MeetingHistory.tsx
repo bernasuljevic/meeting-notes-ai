@@ -174,7 +174,7 @@ function highlightMatch(text: string, query: string): ReactNode {
   return (
     <>
       {text.slice(0, index)}
-      <mark className="rounded-sm bg-amber-200 px-0.5 text-slate-900 dark:bg-amber-400/30 dark:text-amber-100">
+      <mark className="rounded-sm bg-amber-200 px-0.5 text-stone-900 dark:bg-amber-400/30 dark:text-amber-100">
         {text.slice(index, index + trimmed.length)}
       </mark>
       {text.slice(index + trimmed.length)}
@@ -263,28 +263,28 @@ export function MeetingHistory({
 
   return (
     <Card className="overflow-hidden py-0">
-      <CardHeader className="border-b bg-gradient-to-r from-slate-900 to-blue-900 py-5 text-white">
+      <CardHeader className="border-b bg-amber-50/60 py-5 dark:bg-stone-900">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
-            <FolderOpen className="h-5 w-5 text-white" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent shadow-sm">
+            <FolderOpen className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <CardTitle className="text-white">Toplantılar</CardTitle>
-            <CardDescription className="text-slate-300">
+            <CardTitle className="text-stone-900 dark:text-stone-50">Toplantılar</CardTitle>
+            <CardDescription className="text-stone-500 dark:text-stone-400">
               Kaydedilen toplantılar
             </CardDescription>
           </div>
         </div>
       </CardHeader>
 
-      <div className="space-y-2 border-b bg-white p-3 dark:bg-slate-900">
+      <div className="space-y-2 border-b bg-white p-3 dark:bg-stone-900">
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Toplantı ara"
-            className="w-full rounded-xl border border-slate-200 py-2 pr-3 pl-9 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-xl border border-stone-200 py-2 pr-3 pl-9 text-sm outline-none focus:border-amber-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
           />
         </div>
 
@@ -292,7 +292,7 @@ export function MeetingHistory({
           value={sortMode}
           onChange={(e) => setSortMode(e.target.value as SortMode)}
           aria-label="Sıralama"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          className="w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-600 outline-none focus:border-amber-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
         >
           <option value="newest">En yeni</option>
           <option value="oldest">En eski</option>
@@ -321,14 +321,14 @@ export function MeetingHistory({
 
       {!loading && !error && meetings.length === 0 && (
         <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-500/15">
-            <Mic className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-600/15">
+            <Mic className="h-7 w-7 text-amber-600 dark:text-amber-500" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+            <h3 className="font-semibold text-stone-800 dark:text-stone-100">
               Henüz toplantı yok
             </h3>
-            <p className="mt-1 max-w-[220px] text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 max-w-[220px] text-sm text-stone-500 dark:text-stone-400">
               İlk toplantını kaydettiğinde burada görünecek.
             </p>
           </div>
@@ -340,7 +340,7 @@ export function MeetingHistory({
       )}
 
       {!loading && !error && meetings.length > 0 && filteredMeetings.length === 0 && (
-        <CardContent className="py-10 text-center text-slate-500 dark:text-slate-400">
+        <CardContent className="py-10 text-center text-stone-500 dark:text-stone-400">
           Bu arama/filtreyle eşleşen toplantı yok.
         </CardContent>
       )}
@@ -350,7 +350,7 @@ export function MeetingHistory({
           {meetingGroups.map((group, groupIndex) => (
             <div key={group.label ?? `flat-${groupIndex}`}>
               {group.label && (
-                <div className="sticky top-0 z-10 bg-slate-50/95 px-3.5 py-1.5 text-xs font-semibold text-slate-500 backdrop-blur dark:bg-slate-900/95 dark:text-slate-400">
+                <div className="sticky top-0 z-10 bg-stone-50/95 px-3.5 py-1.5 text-xs font-semibold text-stone-500 backdrop-blur dark:bg-stone-900/95 dark:text-stone-400">
                   {group.label}
                 </div>
               )}
@@ -371,22 +371,22 @@ export function MeetingHistory({
                         onMeetingSelect(meeting.id);
                       }
                     }}
-                    className={`group relative flex w-full cursor-pointer items-start gap-3 border-b border-slate-100 p-3.5 text-left transition-all duration-200 dark:border-slate-800 ${
+                    className={`group relative flex w-full cursor-pointer items-start gap-3 border-b border-stone-100 p-3.5 text-left transition-all duration-200 dark:border-stone-800 ${
                       isSelected
-                        ? "border-l-4 border-l-blue-600 bg-blue-50 dark:bg-blue-500/10"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                        ? "border-l-4 border-l-amber-600 bg-amber-50 dark:bg-amber-600/10"
+                        : "hover:bg-stone-50 dark:hover:bg-stone-800/60"
                     }`}
                   >
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-600/15 dark:text-amber-500">
                       <FolderOpen className="h-4 w-4" />
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate pr-8 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <h3 className="truncate pr-8 text-sm font-semibold text-stone-800 dark:text-stone-100">
                         {highlightMatch(meeting.title, searchQuery)}
                       </h3>
 
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
                         <span className="flex items-center gap-1">
                           <CalendarClock className="h-3.5 w-3.5" />
                           {formatMeetingDateTime(meeting.startedAt)}
@@ -407,7 +407,7 @@ export function MeetingHistory({
                       onClick={(e) => requestDelete(e, meeting.id)}
                       disabled={isDeleting}
                       aria-label="Toplantıyı sil"
-                      className="absolute top-3 right-3 h-7 w-7 text-slate-400 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:text-slate-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                      className="absolute top-3 right-3 h-7 w-7 text-stone-400 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:text-stone-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                     >
                       {isDeleting ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

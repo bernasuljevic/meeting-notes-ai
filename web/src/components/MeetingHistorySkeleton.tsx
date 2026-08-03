@@ -7,7 +7,7 @@ export function MeetingHistorySkeleton() {
       {Array.from({ length: 5 }).map((_, index) => (
         <div
           key={index}
-          className="flex items-start gap-3 border-b border-slate-100 p-3.5 dark:border-slate-800"
+          className="flex items-start gap-3 border-b border-stone-100 p-3.5 dark:border-stone-800"
         >
           <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1 space-y-2">

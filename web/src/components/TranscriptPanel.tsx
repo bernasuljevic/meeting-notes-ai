@@ -43,7 +43,7 @@ export function TranscriptPanel({
 
   return (
     <Card className="overflow-hidden py-0">
-      <CardHeader className="border-b bg-gradient-to-r from-slate-900 to-blue-900 py-5 text-white">
+      <CardHeader className="border-b bg-gradient-to-r from-stone-900 to-amber-900 py-5 text-white">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
@@ -51,7 +51,7 @@ export function TranscriptPanel({
             </div>
             <div>
               <CardTitle className="text-white">Transkript</CardTitle>
-              <CardDescription className="text-slate-300">
+              <CardDescription className="text-stone-300">
                 Whisper tarafından oluşturulan konuşma metni
               </CardDescription>
             </div>
@@ -67,9 +67,9 @@ export function TranscriptPanel({
       </CardHeader>
 
       <CardContent className="py-6">
-        <ScrollArea className="h-72 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800/60">
+        <ScrollArea className="h-72 rounded-2xl border border-stone-200 bg-stone-50 p-5 dark:border-stone-700 dark:bg-stone-800/60">
           {transcript ? (
-            <p className="whitespace-pre-wrap leading-8 text-slate-700 dark:text-slate-300">
+            <p className="whitespace-pre-wrap leading-8 text-stone-700 dark:text-stone-300">
               {transcript}
             </p>
           ) : (
