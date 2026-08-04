@@ -133,10 +133,8 @@ function App() {
 
           <div>
 
-            <h1 className="flex items-center gap-2.5 text-3xl font-bold">
-              <img src="/favicon.svg" alt="" className="h-10 w-10 rounded-xl shadow-sm" />
-              <span className="text-stone-900 dark:text-stone-50">Meet</span>
-              <span className="-ml-2.5 text-primary">Brainz</span>
+            <h1>
+              <img src="/logo-wordmark.png" alt="MeetBrainz" className="h-10 w-auto" />
             </h1>
 
             <p className="mt-1 text-stone-500 dark:text-stone-400">

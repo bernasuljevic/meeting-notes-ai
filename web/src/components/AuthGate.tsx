@@ -15,7 +15,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -171,11 +170,7 @@ export function AuthGate() {
     <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <img src="/favicon.svg" alt="" className="mx-auto mb-2 h-14 w-14 rounded-2xl shadow-sm" />
-          <CardTitle className="text-2xl font-bold">
-            <span className="text-stone-900 dark:text-stone-50">Meet</span>
-            <span className="text-primary">Brainz</span>
-          </CardTitle>
+          <img src="/logo-wordmark.png" alt="MeetBrainz" className="mx-auto mb-2 h-16 w-auto" />
           <CardDescription>
             {pendingEmail
               ? "E-postanıza gönderilen kodu girin."

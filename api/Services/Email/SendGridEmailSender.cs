@@ -37,7 +37,7 @@ public class SendGridEmailSender : IEmailSender
             <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 0 auto;">
               <h2 style="color: #241c08;">MeetBrainz doğrulama kodunuz</h2>
               <p style="color: #4a3a1a;">Hesabınızı doğrulamak için aşağıdaki kodu girin:</p>
-              <div style="background: #f2b400; color: #241c08; font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center; padding: 16px; border-radius: 12px; margin: 24px 0;">
+              <div style="background: #f7b916; color: #241c08; font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center; padding: 16px; border-radius: 12px; margin: 24px 0;">
                 {code}
               </div>
               <p style="color: #7a6a4a; font-size: 13px;">Bu kod 15 dakika geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>
